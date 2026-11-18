@@ -13,6 +13,8 @@ import com.crosspoint.launcher.model.HomeMenuItem
 import com.crosspoint.launcher.model.ImageColorMode
 import com.crosspoint.launcher.model.LauncherIconStyle
 import com.crosspoint.launcher.model.SearchGesture
+import com.crosspoint.launcher.model.SwipePage
+import com.crosspoint.launcher.model.SwipePageType
 import com.crosspoint.launcher.model.ThemeType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -48,6 +50,7 @@ data class LauncherSettings(
     val appIconOverrides: Map<String, String> = emptyMap(),
     val coverSlotMode: CoverSlotMode = CoverSlotMode.BOOKS,
     val homeBackgroundVersion: Long = 0L,                // 0 = no background image
+    val swipePages: List<SwipePage> = DEFAULT_SWIPE_PAGES,
     val sleepScreenMode: SleepScreenMode = SleepScreenMode.OFF,
     val lastAppliedSleepCover: String = "",
     val coverWidgetId: Int = -1,
@@ -76,6 +79,8 @@ data class LauncherSettings(
         const val LAUNCH_FLASH_NONE = 0
         const val MAX_HOME_COLUMNS = 8
         const val MAX_HOME_ROWS = 12
+        /** Swiping right from Home showed reading stats before pages were configurable. */
+        val DEFAULT_SWIPE_PAGES = listOf(SwipePage("stats", SwipePageType.STATS))
         val DEFAULT_MENU = listOf(
             HomeMenuItem.BROWSE_BOOKS,
             HomeMenuItem.RECENT_BOOKS,
@@ -117,6 +122,7 @@ class SettingsRepository(private val context: Context) {
         val APP_ICON_OVERRIDES = stringPreferencesKey("app_icon_overrides")
         val COVER_SLOT_MODE = stringPreferencesKey("cover_slot_mode")
         val HOME_BACKGROUND = androidx.datastore.preferences.core.longPreferencesKey("home_background")
+        val SWIPE_PAGES = stringPreferencesKey("swipe_pages")
         val SLEEP_SCREEN_MODE = stringPreferencesKey("sleep_screen_mode")
         val SLEEP_COVER_APPLIED = stringPreferencesKey("sleep_cover_applied")
         val COVER_WIDGET_ID = intPreferencesKey("cover_widget_id")
@@ -162,6 +168,7 @@ class SettingsRepository(private val context: Context) {
             appIconOverrides = parseIconOverrides(p[Keys.APP_ICON_OVERRIDES]),
             coverSlotMode = CoverSlotMode.from(p[Keys.COVER_SLOT_MODE]),
             homeBackgroundVersion = p[Keys.HOME_BACKGROUND] ?: 0L,
+            swipePages = p[Keys.SWIPE_PAGES]?.let(::parseSwipePages) ?: LauncherSettings.DEFAULT_SWIPE_PAGES,
             sleepScreenMode = SleepScreenMode.from(p[Keys.SLEEP_SCREEN_MODE]),
             lastAppliedSleepCover = p[Keys.SLEEP_COVER_APPLIED] ?: "",
             coverWidgetId = p[Keys.COVER_WIDGET_ID] ?: -1,
@@ -261,6 +268,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun setHomeBackgroundVersion(version: Long) =
         context.launcherDataStore.edit { it[Keys.HOME_BACKGROUND] = version }
 
+    /** Applies [change] to the current swipe pages atomically and saves the result. */
+    suspend fun updateSwipePages(change: (List<SwipePage>) -> List<SwipePage>) = context.launcherDataStore.edit { p ->
+        val current = p[Keys.SWIPE_PAGES]?.let(::parseSwipePages) ?: LauncherSettings.DEFAULT_SWIPE_PAGES
+        p[Keys.SWIPE_PAGES] = swipePagesJson(change(current))
+    }
+
     suspend fun setSleepScreenMode(mode: SleepScreenMode) =
         context.launcherDataStore.edit { it[Keys.SLEEP_SCREEN_MODE] = mode.id }
 
@@ -284,6 +297,41 @@ class SettingsRepository(private val context: Context) {
             it[Keys.LAST_OPENED_BOOK_PATH] = path
             it[Keys.LAST_OPENED_BOOK_AT] = openedAt
         }
+
+    private fun swipePagesJson(pages: List<SwipePage>): String = org.json.JSONArray(pages.map { page ->
+        JSONObject()
+            .put("id", page.id)
+            .put("type", page.type.id)
+            .put("side", if (page.left) "left" else "right")
+            .put("app", page.app ?: JSONObject.NULL)
+            .put("feeds", org.json.JSONArray(page.feeds))
+            .put("columns", page.columns)
+            .put("rows", page.rows)
+            .put("apps", org.json.JSONArray(page.apps))
+            .put("widgets", org.json.JSONArray(page.widgetIds))
+    }).toString()
+
+    private fun parseSwipePages(raw: String): List<SwipePage> = runCatching {
+        val array = org.json.JSONArray(raw)
+        (0 until array.length()).mapNotNull { i ->
+            val o = array.getJSONObject(i)
+            val type = SwipePageType.from(o.optString("type")) ?: return@mapNotNull null
+            val feeds = o.optJSONArray("feeds")
+            val widgets = o.optJSONArray("widgets")
+            val apps = o.optJSONArray("apps")
+            SwipePage(
+                id = o.optString("id").ifBlank { "page$i" },
+                type = type,
+                left = o.optString("side") == "left",
+                app = o.optString("app").takeIf { !o.isNull("app") && it.isNotBlank() },
+                feeds = if (feeds == null) emptyList() else (0 until feeds.length()).map { feeds.getString(it) },
+                columns = o.optInt("columns", 4).coerceIn(1, LauncherSettings.MAX_HOME_COLUMNS),
+                rows = o.optInt("rows", 0).coerceIn(0, LauncherSettings.MAX_HOME_ROWS),
+                apps = if (apps == null) emptyList() else (0 until apps.length()).map { apps.getString(it) },
+                widgetIds = if (widgets == null) emptyList() else (0 until widgets.length()).map { widgets.getInt(it) }
+            )
+        }
+    }.getOrDefault(LauncherSettings.DEFAULT_SWIPE_PAGES)
 
     private fun parseIconOverrides(raw: String?): Map<String, String> {
         if (raw.isNullOrBlank()) return emptyMap()

@@ -362,6 +362,55 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsRepo.setDoubleTapRefresh(v) }
     fun setHomeBackgroundVersion(version: Long) =
         viewModelScope.launch { settingsRepo.setHomeBackgroundVersion(version) }
+    // --- swipe-right pages ---
+    private fun updatePages(change: (List<com.crosspoint.launcher.model.SwipePage>) -> List<com.crosspoint.launcher.model.SwipePage>) =
+        viewModelScope.launch { settingsRepo.updateSwipePages(change) }
+    private fun updatePage(id: String, change: (com.crosspoint.launcher.model.SwipePage) -> com.crosspoint.launcher.model.SwipePage) =
+        updatePages { pages -> pages.map { if (it.id == id) change(it) else it } }
+
+    fun addSwipePage(type: com.crosspoint.launcher.model.SwipePageType, left: Boolean) = updatePages { pages ->
+        pages + com.crosspoint.launcher.model.SwipePage("page${System.currentTimeMillis()}", type, left = left)
+    }
+    fun removeSwipePage(id: String) {
+        settings.value.swipePages.firstOrNull { it.id == id }?.widgetIds?.forEach {
+            com.crosspoint.launcher.ui.home.deleteHostedWidget(getApplication(), it)
+        }
+        updatePages { pages -> pages.filterNot { it.id == id } }
+    }
+    /** Moves a page [by] places among the pages on its own side of Home. */
+    fun moveSwipePage(id: String, by: Int) = updatePages { pages ->
+        val page = pages.firstOrNull { it.id == id } ?: return@updatePages pages
+        val side = pages.filter { it.left == page.left }
+        val other = side.getOrNull(side.indexOf(page) + by) ?: return@updatePages pages
+        pages.map { when (it.id) { page.id -> other; other.id -> page; else -> it } }
+    }
+    fun setSwipePageSide(id: String, left: Boolean) = updatePages { pages ->
+        // Moves the page to the far end of the other side.
+        val page = pages.firstOrNull { it.id == id } ?: return@updatePages pages
+        pages.filterNot { it.id == id } + page.copy(left = left)
+    }
+    fun setSwipePageApp(id: String, appKey: String) = updatePage(id) { it.copy(app = appKey) }
+    fun setSwipePageColumns(id: String, columns: Int) =
+        updatePage(id) { it.copy(columns = columns.coerceIn(1, LauncherSettings.MAX_HOME_COLUMNS)) }
+    fun setSwipePageRows(id: String, rows: Int) =
+        updatePage(id) { it.copy(rows = rows.coerceIn(0, LauncherSettings.MAX_HOME_ROWS)) }
+    /** Adds an app to an app grid page (at the end), or removes it if already there. */
+    fun toggleSwipePageApp(id: String, appKey: String) =
+        updatePage(id) { if (appKey in it.apps) it.copy(apps = it.apps - appKey) else it.copy(apps = it.apps + appKey) }
+    fun moveSwipePageApp(id: String, appKey: String, by: Int) = updatePage(id) { page ->
+        val from = page.apps.indexOf(appKey)
+        val to = from + by
+        if (from < 0 || to !in page.apps.indices) page
+        else page.copy(apps = page.apps.toMutableList().apply { add(to, removeAt(from)) })
+    }
+    fun addSwipePageFeed(id: String, url: String) = updatePage(id) { it.copy(feeds = (it.feeds + url.trim()).distinct()) }
+    fun removeSwipePageFeed(id: String, url: String) = updatePage(id) { it.copy(feeds = it.feeds - url) }
+    fun addSwipePageWidget(id: String, widgetId: Int) = updatePage(id) { it.copy(widgetIds = it.widgetIds + widgetId) }
+    fun removeSwipePageWidget(id: String, widgetId: Int) {
+        com.crosspoint.launcher.ui.home.deleteHostedWidget(getApplication(), widgetId)
+        updatePage(id) { it.copy(widgetIds = it.widgetIds - widgetId) }
+    }
+
     fun setSleepScreenMode(mode: com.crosspoint.launcher.model.SleepScreenMode) =
         viewModelScope.launch { settingsRepo.setSleepScreenMode(mode) }
     fun setLastAppliedSleepCover(path: String) =

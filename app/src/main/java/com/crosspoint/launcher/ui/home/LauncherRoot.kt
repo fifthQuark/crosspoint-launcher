@@ -38,7 +38,7 @@ import com.crosspoint.launcher.util.Launching
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
-enum class Screen { HOME, STATS, DRAWER, SETTINGS, BOOKS, SEARCH, OPDS, OPDS_SERVERS, TRANSFER }
+enum class Screen { HOME, PAGE, DRAWER, SETTINGS, BOOKS, SEARCH, OPDS, OPDS_SERVERS, TRANSFER }
 
 @Composable
 fun LauncherRoot(
@@ -46,12 +46,15 @@ fun LauncherRoot(
     homeResetSignal: Int,
     isDefaultHome: Boolean,
     onRequestDefaultHome: () -> Unit,
-    onPickWidget: () -> Unit
+    onPickWidget: () -> Unit,
+    onPickPageWidget: (pageId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val colors = CrossPointTheme.colors
     var booksTitle by rememberSaveable { mutableStateOf("Library") }
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
+    // 0 is Home; 1, 2, … are pages reached by swiping right, and -1, -2, … by swiping left.
+    var pagePosition by rememberSaveable { mutableStateOf(0) }
     var bannerDismissed by rememberSaveable { mutableStateOf(false) }
     var bookMenu by remember { mutableStateOf<com.crosspoint.launcher.model.Book?>(null) }
 
@@ -166,20 +169,58 @@ fun LauncherRoot(
         }
     }
 
-    val statsSwipe = if (screen == Screen.HOME || screen == Screen.STATS) Modifier.pointerInput(screen, swipeThresholdPx) {
+    // Settings > Swipe Pages: swiping right walks out through the right-hand pages and swiping left
+    // through the left-hand ones; swiping the other way walks back towards Home.
+    val pages = settings.swipePages
+    val rightPages = pages.filterNot { it.left }
+    val leftPages = pages.filter { it.left }
+    fun pageAt(position: Int) = when {
+        position > 0 -> rightPages.getOrNull(position - 1)
+        position < 0 -> leftPages.getOrNull(-position - 1)
+        else -> null
+    }
+    val currentPosition = if (screen == Screen.PAGE) pagePosition else 0
+    fun goTo(position: Int) {
+        if (position == 0) { screen = Screen.HOME; pagePosition = 0; return }
+        val page = pageAt(position) ?: return
+        val outward = abs(position) > abs(currentPosition)
+        screen = Screen.PAGE
+        pagePosition = position
+        if (outward && page.type == com.crosspoint.launcher.model.SwipePageType.APP) {
+            apps.firstOrNull { "${it.packageName}/${it.activityName}" == page.app }?.let { launchApp(it.packageName, it.activityName) }
+        }
+    }
+    val pageSwipe = if ((screen == Screen.HOME && pages.isNotEmpty()) || screen == Screen.PAGE) Modifier.pointerInput(screen, pagePosition, pages, swipeThresholdPx) {
         var horizontalDrag = 0f
         detectHorizontalDragGestures(
             onDragStart = { horizontalDrag = 0f },
             onDragCancel = { horizontalDrag = 0f },
             onDragEnd = {
-                if (screen == Screen.HOME && horizontalDrag > swipeThresholdPx) screen = Screen.STATS
-                else if (screen == Screen.STATS && horizontalDrag < -swipeThresholdPx) screen = Screen.HOME
+                if (horizontalDrag > swipeThresholdPx) goTo(currentPosition + 1)
+                else if (horizontalDrag < -swipeThresholdPx) goTo(currentPosition - 1)
             }
         ) { change, amount -> change.consume(); horizontalDrag += amount }
     } else Modifier
-    Box(Modifier.fillMaxSize().background(colors.background).then(statsSwipe)) {
+    Box(Modifier.fillMaxSize().background(colors.background).then(pageSwipe)) {
         when (screen) {
-            Screen.STATS -> com.crosspoint.launcher.ui.stats.StatsScreen(onBack = { screen = Screen.HOME })
+            Screen.PAGE -> {
+                val page = pageAt(pagePosition)
+                if (page == null) LaunchedEffect(Unit) { screen = Screen.HOME; pagePosition = 0 }
+                else com.crosspoint.launcher.ui.pages.SwipePageScreen(
+                    page = page,
+                    position = if (pagePosition > 0) "${pagePosition}/${rightPages.size} →" else "← ${-pagePosition}/${leftPages.size}",
+                    apps = apps,
+                    settings = settings,
+                    actions = com.crosspoint.launcher.ui.pages.SwipePageActions(
+                        onLaunchApp = launchApp,
+                        onAppInfo = { Launching.openAppInfo(context, it) },
+                        onAddWidget = onPickPageWidget,
+                        onRemoveWidget = { id, widget -> vm.removeSwipePageWidget(id, widget) },
+                        onOpenSettings = { screen = Screen.SETTINGS },
+                        onBack = { screen = Screen.HOME; pagePosition = 0 }
+                    )
+                )
+            }
             Screen.HOME -> androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().homeBackground(settings.homeBackgroundVersion).then(homeGestureModifier)) {
               if (!isDefaultHome && !bannerDismissed) {
                 DefaultHomeBanner(
@@ -250,6 +291,7 @@ fun LauncherRoot(
                 onOpenOpdsServers = { screen = Screen.OPDS_SERVERS },
                 onPickWidget = onPickWidget,
                 onClearWidget = { vm.clearCoverWidget() },
+                onPickPageWidget = onPickPageWidget,
                 onBack = { screen = Screen.HOME }
             )
             Screen.OPDS_SERVERS -> OpdsServersScreen(

@@ -85,6 +85,7 @@ fun SettingsScreen(
     onOpenOpdsServers: () -> Unit,
     onPickWidget: () -> Unit,
     onClearWidget: () -> Unit,
+    onPickPageWidget: (pageId: String) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -120,6 +121,7 @@ fun SettingsScreen(
     }
 
     var category by remember { mutableStateOf<String?>(null) }
+    var pickingAppForPage by remember { mutableStateOf<String?>(null) }
     val launchable = remember(apps) { apps.associateBy { it.packageName } }
     // The chosen store, falling back to Aurora Store as before when none was chosen.
     val storeApp = (settings.appStorePackage ?: AuroraInstaller.PACKAGE).let { launchable[it] }
@@ -192,13 +194,23 @@ fun SettingsScreen(
     val categories = listOf(
         "Home Theme" to "layout_grid", "Appearance" to "sun",
         "App Search" to "search", "CrossPoint Sync" to "crosspoint", "Default Reader" to "book_open",
-        "Default App Store" to "shopping_bag", "Home Screen Items" to "rows_3", "OPDS Catalogs" to "library",
+        "Default App Store" to "shopping_bag", "Home Screen Items" to "rows_3",
+        "Swipe Pages" to "gallery_horizontal_end", "OPDS Catalogs" to "library",
         "Library" to "folder_open", (if (storeApp != null) "App Store" else "Get App Store") to "store",
         "Device Settings" to "settings"
     )
     androidx.activity.compose.BackHandler(category != null) { category = null }
+    androidx.activity.compose.BackHandler(pickingAppForPage != null) { pickingAppForPage = null }
     Column(Modifier.fillMaxSize().padding(top = topPad)) {
-        ScreenHeader(category ?: "Settings", { if (category == null) onBack() else category = null }) {
+        ScreenHeader(if (pickingAppForPage != null) settings.swipePages.firstOrNull { it.id == pickingAppForPage }
+            ?.let { if (it.type == com.crosspoint.launcher.model.SwipePageType.APP) "Choose App" else "Choose Apps" } ?: "Choose App"
+            else category ?: "Settings", {
+            when {
+                category == null -> onBack()
+                pickingAppForPage != null -> pickingAppForPage = null
+                else -> category = null
+            }
+        }) {
             if (category == null) Pressable(onClick = ::onVersionTap) {
                 BodyText(updateStatus ?: update?.let { "Update" } ?: "v${BuildConfig.VERSION_NAME}",
                     weight = if (update != null) FontWeight.Bold else FontWeight.Normal, size = 14, maxLines = 1,
@@ -225,7 +237,7 @@ fun SettingsScreen(
                     }
                 }
             }
-        } else ScrollList(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = m.contentSidePadding), state = remember(category) { androidx.compose.foundation.lazy.LazyListState() }) {
+        } else ScrollList(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = m.contentSidePadding), state = remember(category, pickingAppForPage) { androidx.compose.foundation.lazy.LazyListState() }) {
             when (category) {
                 "Home Theme" -> items(ThemeType.entries.filter { it != ThemeType.CAROUSEL }) { theme -> SelectRow(theme.label, theme.description, settings.theme == theme) { vm.setTheme(theme) } }
                 "Appearance" -> {
@@ -379,6 +391,20 @@ fun SettingsScreen(
                     }
                     items(others, key = { "other:${it.packageName}" }) { app ->
                         SelectRow(app.label, app.packageName, settings.appStorePackage == app.packageName) { vm.setAppStore(app.packageName) }
+                    }
+                }
+                "Swipe Pages" -> {
+                    val pageId = pickingAppForPage
+                    val pickingPage = settings.swipePages.firstOrNull { it.id == pageId }
+                    if (pickingPage != null && pickingPage.type != com.crosspoint.launcher.model.SwipePageType.APP) {
+                        swipePageAppsPicker(pickingPage, apps, vm)
+                    } else if (pickingPage != null) {
+                        swipePageAppPicker(apps, pickingPage.app) { app ->
+                            vm.setSwipePageApp(pickingPage.id, "${app.packageName}/${app.activityName}")
+                            pickingAppForPage = null
+                        }
+                    } else {
+                        swipePagesSettings(settings, apps, vm, onChooseApp = { pickingAppForPage = it }, onAddWidget = onPickPageWidget)
                     }
                 }
                 "OPDS Catalogs" -> item { ActionRow("OPDS Servers", "${opdsServers.size} configured", "library", onOpenOpdsServers) }

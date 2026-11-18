@@ -131,6 +131,39 @@ enum class HomeMenuItem(val id: String, val label: String, val icon: String) {
     }
 }
 
+/** What a page reached by swiping right from Home shows. */
+enum class SwipePageType(val id: String, val label: String, val description: String, val icon: String) {
+    STATS("stats", "Reading Stats", "CrossPoint Sync reading activity", "calendar"),
+    APP("app", "Launch an App", "Swiping here opens the chosen app", "app_window"),
+    RSS("rss", "RSS Reader", "Latest articles from your feeds", "rss"),
+    NOTIFICATIONS("notifications", "Notifications", "Your current notifications", "bell"),
+    APP_GRID("apps", "App Grid", "A page of apps you choose", "layout_grid"),
+    APP_GRID_WIDGETS("apps_widgets", "App Grid with Widgets", "Widgets above apps you choose", "panels_top_left"),
+    WIDGETS("widgets", "Widgets", "A page of widgets", "boxes");
+
+    companion object {
+        fun from(id: String?): SwipePageType? = entries.firstOrNull { it.id == id }
+    }
+}
+
+/**
+ * One page beside Home, reached by swiping right, or by swiping left when [left] is set. Only the
+ * fields for its [type] are used: [app] is a "package/activity" key, [feeds] are RSS/Atom URLs,
+ * [apps] are the "package/activity" keys an app grid shows in [columns] × [rows] (0 rows = fit them
+ * all), and [widgetIds] are hosted app widgets.
+ */
+data class SwipePage(
+    val id: String,
+    val type: SwipePageType,
+    val left: Boolean = false,
+    val app: String? = null,
+    val feeds: List<String> = emptyList(),
+    val columns: Int = 4,
+    val rows: Int = 0,
+    val apps: List<String> = emptyList(),
+    val widgetIds: List<Int> = emptyList()
+)
+
 /** A configured OPDS catalog server (matches the reader's OpdsServer struct). */
 data class OpdsServer(
     val id: String,

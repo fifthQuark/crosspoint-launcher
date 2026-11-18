@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var widgetConfigureLauncher: ActivityResultLauncher<Intent>
     private val widgetHost by lazy { AppWidgetHost(this, CROSSPOINT_WIDGET_HOST_ID) }
     private var pendingWidgetId = -1
+    // Swipe page receiving the widget being picked; null means the Home cover slot.
+    private var pendingWidgetPage: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,7 +74,7 @@ class MainActivity : ComponentActivity() {
             val id = result.data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId)
                 ?: pendingWidgetId
             if (result.resultCode == RESULT_OK && id > 0) {
-                viewModelOrNull()?.setCoverWidget(id)
+                saveWidget(id)
             } else if (id > 0) {
                 widgetHost.deleteAppWidgetId(id)
             }
@@ -95,7 +97,8 @@ class MainActivity : ComponentActivity() {
                             homeResetSignal = homeResetSignal.value,
                             isDefaultHome = isDefaultHome.value,
                             onRequestDefaultHome = { requestDefaultHome() },
-                            onPickWidget = { pickCoverWidget() }
+                            onPickWidget = { pickCoverWidget() },
+                            onPickPageWidget = { pickCoverWidget(it) }
                         )
                     }
                 }
@@ -160,9 +163,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun pickCoverWidget() {
+    private fun pickCoverWidget(pageId: String? = null) {
         val id = widgetHost.allocateAppWidgetId()
         pendingWidgetId = id
+        pendingWidgetPage = pageId
         val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
         }
@@ -188,8 +192,15 @@ class MainActivity : ComponentActivity() {
                     pendingWidgetId = -1
                 }
         } else {
-            viewModelOrNull()?.setCoverWidget(appWidgetId)
+            saveWidget(appWidgetId)
         }
+    }
+
+    private fun saveWidget(appWidgetId: Int) {
+        val page = pendingWidgetPage
+        pendingWidgetPage = null
+        if (page != null) viewModelOrNull()?.addSwipePageWidget(page, appWidgetId)
+        else viewModelOrNull()?.setCoverWidget(appWidgetId)
     }
 
     private fun applyStatusBarVisibility() {
