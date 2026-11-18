@@ -104,7 +104,7 @@ fun LauncherRoot(
         vm.markBookOpened(path)
         val launch = { Launching.openBook(context, path, settings.defaultReaderPackage) }
         // Clear the cover's ghosting with a full refresh before the reader takes over.
-        (context as? android.app.Activity)?.let { com.crosspoint.launcher.util.ScreenRefresh.flashThen(it, launch) } ?: launch()
+        (context as? android.app.Activity)?.let { com.crosspoint.launcher.util.ScreenRefresh.flashThen(it, launch, settings.launchFlash(colors.isDark)) } ?: launch()
     }
     val openBookChooser: (String) -> Unit = { path ->
         vm.markBookOpened(path)
@@ -113,7 +113,7 @@ fun LauncherRoot(
     val launchApp: (String, String) -> Unit = { pkg, act ->
         val launch = { Launching.launchApp(context, pkg, act) }
         // Full refresh clears launcher ghosting before the app takes the screen.
-        (context as? android.app.Activity)?.let { com.crosspoint.launcher.util.ScreenRefresh.flashThen(it, launch) } ?: launch()
+        (context as? android.app.Activity)?.let { com.crosspoint.launcher.util.ScreenRefresh.flashThen(it, launch, settings.launchFlash(colors.isDark)) } ?: launch()
     }
 
     val density = LocalDensity.current

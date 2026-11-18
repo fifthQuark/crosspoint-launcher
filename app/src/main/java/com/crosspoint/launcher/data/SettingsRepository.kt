@@ -40,6 +40,8 @@ data class LauncherSettings(
     val showLauncherBattery: Boolean = true,
     val showLauncherWifi: Boolean = true,
     val doubleTapRefresh: Boolean = false,
+    val launchFlashLight: Int = LAUNCH_FLASH_WHITE,      // ARGB; LAUNCH_FLASH_NONE skips the flash
+    val launchFlashDark: Int = LAUNCH_FLASH_WHITE,
     val launcherIconStyle: LauncherIconStyle = LauncherIconStyle.ICONS,
     val iconPackPackage: String? = null,                 // null = each app's own icon
     val iconPackFallback: String? = null,                // used for apps the main pack lacks
@@ -67,7 +69,11 @@ data class LauncherSettings(
     /** True when Home items use the user's rows × columns grid instead of the theme layout. */
     val homeGrid: Boolean get() = homeColumns > 0
 
+    fun launchFlash(dark: Boolean): Int = if (dark) launchFlashDark else launchFlashLight
+
     companion object {
+        const val LAUNCH_FLASH_WHITE = 0xFFFFFFFF.toInt()
+        const val LAUNCH_FLASH_NONE = 0
         const val MAX_HOME_COLUMNS = 8
         const val MAX_HOME_ROWS = 12
         val DEFAULT_MENU = listOf(
@@ -103,6 +109,8 @@ class SettingsRepository(private val context: Context) {
         val SHOW_LAUNCHER_BATTERY = booleanPreferencesKey("show_launcher_battery")
         val SHOW_LAUNCHER_WIFI = booleanPreferencesKey("show_launcher_wifi")
         val DOUBLE_TAP_REFRESH = booleanPreferencesKey("double_tap_refresh")
+        val LAUNCH_FLASH_LIGHT = intPreferencesKey("launch_flash_light")
+        val LAUNCH_FLASH_DARK = intPreferencesKey("launch_flash_dark")
         val LAUNCHER_ICON_STYLE = stringPreferencesKey("launcher_icon_style")
         val ICON_PACK = stringPreferencesKey("icon_pack")
         val ICON_PACK_FALLBACK = stringPreferencesKey("icon_pack_fallback")
@@ -146,6 +154,8 @@ class SettingsRepository(private val context: Context) {
             showLauncherBattery = p[Keys.SHOW_LAUNCHER_BATTERY] ?: true,
             showLauncherWifi = p[Keys.SHOW_LAUNCHER_WIFI] ?: true,
             doubleTapRefresh = p[Keys.DOUBLE_TAP_REFRESH] ?: false,
+            launchFlashLight = p[Keys.LAUNCH_FLASH_LIGHT] ?: LauncherSettings.LAUNCH_FLASH_WHITE,
+            launchFlashDark = p[Keys.LAUNCH_FLASH_DARK] ?: LauncherSettings.LAUNCH_FLASH_WHITE,
             launcherIconStyle = LauncherIconStyle.from(p[Keys.LAUNCHER_ICON_STYLE]),
             iconPackPackage = p[Keys.ICON_PACK],
             iconPackFallback = p[Keys.ICON_PACK_FALLBACK],
@@ -221,6 +231,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setDoubleTapRefresh(v: Boolean) =
         context.launcherDataStore.edit { it[Keys.DOUBLE_TAP_REFRESH] = v }
+
+    suspend fun setLaunchFlash(dark: Boolean, color: Int) = context.launcherDataStore.edit {
+        it[if (dark) Keys.LAUNCH_FLASH_DARK else Keys.LAUNCH_FLASH_LIGHT] = color
+    }
 
     suspend fun setLauncherIconStyle(style: LauncherIconStyle) =
         context.launcherDataStore.edit { it[Keys.LAUNCHER_ICON_STYLE] = style.id }

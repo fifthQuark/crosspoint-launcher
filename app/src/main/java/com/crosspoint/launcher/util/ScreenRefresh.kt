@@ -33,20 +33,22 @@ object ScreenRefresh {
     }
 
     /**
-     * Full black→white refresh, then run [action] (e.g. launch an app) onto the clean white frame.
+     * Full black→[color] refresh, then run [action] (e.g. launch an app) onto the clean frame. White
+     * is the default; a fully transparent [color] skips the flash and runs [action] right away.
      *
      * The overlay must cover home for the WHOLE launch — including a slow cold start. Removing it on a
      * timer re-exposes home before the new app paints, and the app then draws over that fresh home image
      * (the ghosting bug). So we keep white covering home until the launcher is actually shown again
      * (its next onResume after pausing for the launched app), never on a timer.
      */
-    fun flashThen(activity: Activity, action: () -> Unit) {
+    fun flashThen(activity: Activity, action: () -> Unit, color: Int = Color.WHITE) {
+        if (Color.alpha(color) == 0) { action(); return }
         val root = activity.window.decorView as ViewGroup
         val overlay = View(activity).apply { setBackgroundColor(Color.BLACK) }
         root.addView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         val remove = { if (overlay.parent != null) root.removeView(overlay) }
-        // Black settles a full GC, then white clears it; launch after the white update has finished.
-        overlay.postDelayed({ overlay.setBackgroundColor(Color.WHITE) }, FLASH_MS)
+        // Black settles a full GC, then the flash color clears it; launch after that update has finished.
+        overlay.postDelayed({ overlay.setBackgroundColor(color) }, FLASH_MS)
         overlay.postDelayed({ action() }, FLASH_MS * 2)
 
         val lifecycle = (activity as? LifecycleOwner)?.lifecycle

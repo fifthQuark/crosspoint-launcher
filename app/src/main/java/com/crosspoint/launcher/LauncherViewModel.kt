@@ -357,6 +357,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsRepo.setShowLauncherBattery(v) }
     fun setShowLauncherWifi(v: Boolean) =
         viewModelScope.launch { settingsRepo.setShowLauncherWifi(v) }
+    fun setLaunchFlash(dark: Boolean, color: Int) = viewModelScope.launch { settingsRepo.setLaunchFlash(dark, color) }
     fun setDoubleTapRefresh(v: Boolean) =
         viewModelScope.launch { settingsRepo.setDoubleTapRefresh(v) }
     fun setHomeBackgroundVersion(version: Long) =

@@ -271,6 +271,9 @@ fun SettingsScreen(
                             }
                         }
                     }
+                    item { BodyText("App Launch Flash", weight = FontWeight.Bold, size = 14, muted = true, modifier = Modifier.padding(top = 12.dp, start = 6.dp)) }
+                    item { FlashColorRow("In Light Mode", settings.launchFlashLight) { vm.setLaunchFlash(dark = false, color = it) } }
+                    item { FlashColorRow("In Dark Mode", settings.launchFlashDark) { vm.setLaunchFlash(dark = true, color = it) } }
                     item { ToggleRow("Show Date", "calendar", settings.showLauncherDate) { vm.setShowLauncherDate(!settings.showLauncherDate) } }
                     item { ToggleRow("Show Clock", "clock", settings.showLauncherClock) { vm.setShowLauncherClock(!settings.showLauncherClock) } }
                     item { ToggleRow("Show Battery", "battery", settings.showLauncherBattery) { vm.setShowLauncherBattery(!settings.showLauncherBattery) } }
@@ -566,6 +569,64 @@ private fun HomeItemSettingsRow(
                     }
                 }
             }
+        }
+    }
+}
+
+private val FLASH_SWATCHES = listOf(
+    "White" to 0xFFFFFFFF.toInt(), "Light Gray" to 0xFFC8C8C8.toInt(), "Gray" to 0xFF808080.toInt(),
+    "Dark Gray" to 0xFF404040.toInt(), "Black" to 0xFF000000.toInt()
+)
+
+/** Picks the color shown while an app launches: preset grays, a custom #RRGGBB, or None. */
+@Composable
+private fun FlashColorRow(title: String, selected: Int, onSelect: (Int) -> Unit) {
+    val colors = CrossPointTheme.colors
+    val none = com.crosspoint.launcher.data.LauncherSettings.LAUNCH_FLASH_NONE
+    var custom by remember(selected) {
+        mutableStateOf(if (selected == none || FLASH_SWATCHES.any { it.second == selected }) "" else "#%06X".format(selected and 0xFFFFFF))
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        BodyText(title, weight = FontWeight.SemiBold, size = 16)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FLASH_SWATCHES.forEach { (name, color) ->
+                Pressable(onClick = { onSelect(color) }, modifier = Modifier.semantics {
+                    contentDescription = "$title: $name"
+                    stateDescription = if (selected == color) "Selected" else "Not Selected"
+                }) {
+                    Box(
+                        Modifier.size(36.dp).clip(RoundedCornerShape(18.dp))
+                            .background(androidx.compose.ui.graphics.Color(color))
+                            .border(if (selected == color) 3.dp else 1.dp, colors.divider, RoundedCornerShape(18.dp))
+                    )
+                }
+            }
+            Pressable(onClick = { onSelect(none) }) {
+                Row(Modifier.heightIn(min = 36.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioDot(selected == none)
+                    Spacer(Modifier.width(6.dp))
+                    BodyText("None", size = 14)
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BodyText("Custom", size = 14, muted = true)
+            Spacer(Modifier.width(12.dp))
+            BasicTextField(
+                value = custom,
+                onValueChange = { text ->
+                    custom = text.take(7)
+                    Regex("#?([0-9a-fA-F]{6})").matchEntire(custom.trim())?.let { onSelect(0xFF000000.toInt() or it.groupValues[1].toInt(16)) }
+                },
+                singleLine = true,
+                textStyle = TextStyle(color = colors.onBackground, fontSize = 16.sp),
+                cursorBrush = SolidColor(colors.onBackground),
+                modifier = Modifier.width(120.dp).border(1.dp, colors.divider, RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
+                decorationBox = { inner ->
+                    if (custom.isEmpty()) BodyText("#RRGGBB", muted = true, size = 16)
+                    inner()
+                }
+            )
         }
     }
 }
