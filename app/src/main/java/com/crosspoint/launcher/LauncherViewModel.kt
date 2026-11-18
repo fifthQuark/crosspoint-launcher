@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.collectLatest
@@ -68,10 +69,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { opdsRepo.upsert(s) }
     fun deleteOpdsServer(id: String) = viewModelScope.launch { opdsRepo.delete(id) }
 
+    // Read saved settings before the first frame, so Home never flashes the defaults first.
     val settings: StateFlow<LauncherSettings> = settingsRepo.settings
-        .stateIn(viewModelScope, SharingStarted.Eagerly, LauncherSettings())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, runCatching {
+            kotlinx.coroutines.runBlocking { settingsRepo.settings.first() }
+        }.getOrDefault(LauncherSettings()))
 
-    private val _apps = MutableStateFlow<List<AppInfo>>(emptyList())
+    /** Last known apps, icons and books, drawn immediately and then refreshed in the background. */
+    private val stateCache = com.crosspoint.launcher.data.LauncherStateCache(app)
+
+    private val _apps = MutableStateFlow(stateCache.readApps())
     val apps: StateFlow<List<AppInfo>> = _apps.asStateFlow()
 
     private val _readerApps = MutableStateFlow<List<AppInfo>>(emptyList())
@@ -82,13 +89,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val iconPacks: StateFlow<List<com.crosspoint.launcher.data.IconPack>> = _iconPacks.asStateFlow()
 
     /** Icons from the chosen icon pack, keyed by "package/activity". */
-    private val _packIcons = MutableStateFlow<Map<String, androidx.compose.ui.graphics.ImageBitmap>>(emptyMap())
+    private val _packIcons = MutableStateFlow(stateCache.readPackIcons(chosenPacks(settings.value)))
     val packIcons: StateFlow<Map<String, androidx.compose.ui.graphics.ImageBitmap>> = _packIcons.asStateFlow()
 
     private val _storeApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val storeApps: StateFlow<List<AppInfo>> = _storeApps.asStateFlow()
 
-    private val _books = MutableStateFlow<List<Book>>(emptyList())
+    private val _books = MutableStateFlow(if (hasStoragePermission()) stateCache.readBooks() else emptyList())
     val books: StateFlow<List<Book>> = _books.asStateFlow()
 
     private val _externalReading = MutableStateFlow<ExternalReadingState?>(null)
@@ -142,17 +149,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // Reload pack icons only when the chosen packs or the installed apps change.
         viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(
-                settings.map {
-                    if (it.launcherIconStyle != LauncherIconStyle.ICON_PACK) emptyList()
-                    else listOfNotNull(it.iconPackPackage, it.iconPackFallback).distinct()
-                }.distinctUntilChanged(),
-                apps
-            ) { packs, apps -> packs to apps }
+            kotlinx.coroutines.flow.combine(settings.map(::chosenPacks).distinctUntilChanged(), apps) { packs, apps -> packs to apps }
                 .collectLatest { (packs, apps) ->
+                    if (apps.isEmpty()) return@collectLatest
                     // The main pack wins; the fallback pack fills in apps the main pack lacks.
-                    _packIcons.value = if (apps.isEmpty()) emptyMap()
-                        else packs.reversed().fold(emptyMap()) { icons, pack -> icons + iconPackRepo.loadIcons(pack, apps) }
+                    val icons = packs.reversed().fold(emptyMap<String, androidx.compose.ui.graphics.ImageBitmap>()) { icons, pack ->
+                        icons + iconPackRepo.loadIcons(pack, apps)
+                    }
+                    // Keep the cached icons on screen when nothing changed, to avoid a redraw.
+                    if (!com.crosspoint.launcher.data.LauncherStateCache.sameIcons(icons, _packIcons.value)) _packIcons.value = icons
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { stateCache.writePackIcons(packs, icons) }
                 }
         }
         val filter = IntentFilter().apply {
@@ -199,7 +205,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshApps() {
         if (appsJob?.isActive == true) return
         appsJob = viewModelScope.launch {
-            _apps.value = appRepo.loadLaunchableApps()
+            val fresh = appRepo.loadLaunchableApps()
+            // Keep the cached list (and its icons) when nothing changed, to avoid a redraw.
+            if (!com.crosspoint.launcher.data.LauncherStateCache.sameApps(fresh, _apps.value)) _apps.value = fresh
+            launch(kotlinx.coroutines.Dispatchers.IO) { stateCache.writeApps(fresh) }
             _readerApps.value = appRepo.loadReaderApps()
             _storeApps.value = appRepo.loadStoreApps()
             _iconPacks.value = iconPackRepo.installedPacks()
@@ -274,7 +283,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         booksJob = viewModelScope.launch {
             _booksLoading.value = true
             try {
-                _books.value = scanner.scan(settings.value.bookFolders)
+                val scanned = scanner.scan(settings.value.bookFolders)
+                _books.value = scanned // an unchanged list is equal, so nothing redraws
+                launch(kotlinx.coroutines.Dispatchers.IO) { stateCache.writeBooks(scanned) }
                 if (syncRepo.connected) fetchMissingCovers()
             } finally { _booksLoading.value = false }
         }
@@ -362,6 +373,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsRepo.setDoubleTapRefresh(v) }
     fun setHomeBackgroundVersion(version: Long) =
         viewModelScope.launch { settingsRepo.setHomeBackgroundVersion(version) }
+    private fun chosenPacks(settings: LauncherSettings): List<String> =
+        if (settings.launcherIconStyle != LauncherIconStyle.ICON_PACK) emptyList()
+        else listOfNotNull(settings.iconPackPackage, settings.iconPackFallback).distinct()
+
     // --- swipe-right pages ---
     private fun updatePages(change: (List<com.crosspoint.launcher.model.SwipePage>) -> List<com.crosspoint.launcher.model.SwipePage>) =
         viewModelScope.launch { settingsRepo.updateSwipePages(change) }
