@@ -87,14 +87,17 @@ class MainActivity : ComponentActivity() {
                 applyStatusBarVisibility()
             }
             CrossPointTheme(appearance = settings.appearance, metrics = Metrics(), imageColorMode = settings.imageColorMode) {
+                val packIcons by vm.packIcons.collectAsState()
                 AdaptiveMetrics {
-                    LauncherRoot(
-                        vm = vm,
-                        homeResetSignal = homeResetSignal.value,
-                        isDefaultHome = isDefaultHome.value,
-                        onRequestDefaultHome = { requestDefaultHome() },
-                        onPickWidget = { pickCoverWidget() }
-                    )
+                    androidx.compose.runtime.CompositionLocalProvider(com.crosspoint.launcher.ui.components.LocalPackIcons provides packIcons) {
+                        LauncherRoot(
+                            vm = vm,
+                            homeResetSignal = homeResetSignal.value,
+                            isDefaultHome = isDefaultHome.value,
+                            onRequestDefaultHome = { requestDefaultHome() },
+                            onPickWidget = { pickCoverWidget() }
+                        )
+                    }
                 }
             }
         }

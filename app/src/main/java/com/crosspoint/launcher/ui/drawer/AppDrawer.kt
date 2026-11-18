@@ -137,7 +137,7 @@ private fun DrawerRow(
             Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AppIcon(app.icon, app.label, size = 32.dp)
+            AppIcon(com.crosspoint.launcher.ui.components.appIconBitmap(app), app.label, size = 32.dp)
             Spacer(Modifier.width(16.dp))
             BodyText(app.label, weight = FontWeight.Medium, size = 17, modifier = Modifier.weight(1f))
             Pressable(onClick = onTogglePin) {

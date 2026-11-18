@@ -41,6 +41,8 @@ data class LauncherSettings(
     val showLauncherWifi: Boolean = true,
     val doubleTapRefresh: Boolean = false,
     val launcherIconStyle: LauncherIconStyle = LauncherIconStyle.ICONS,
+    val iconPackPackage: String? = null,                 // null = each app's own icon
+    val iconPackFallback: String? = null,                // used for apps the main pack lacks
     val appIconOverrides: Map<String, String> = emptyMap(),
     val coverSlotMode: CoverSlotMode = CoverSlotMode.BOOKS,
     val sleepScreenMode: SleepScreenMode = SleepScreenMode.OFF,
@@ -101,6 +103,8 @@ class SettingsRepository(private val context: Context) {
         val SHOW_LAUNCHER_WIFI = booleanPreferencesKey("show_launcher_wifi")
         val DOUBLE_TAP_REFRESH = booleanPreferencesKey("double_tap_refresh")
         val LAUNCHER_ICON_STYLE = stringPreferencesKey("launcher_icon_style")
+        val ICON_PACK = stringPreferencesKey("icon_pack")
+        val ICON_PACK_FALLBACK = stringPreferencesKey("icon_pack_fallback")
         val APP_ICON_OVERRIDES = stringPreferencesKey("app_icon_overrides")
         val COVER_SLOT_MODE = stringPreferencesKey("cover_slot_mode")
         val SLEEP_SCREEN_MODE = stringPreferencesKey("sleep_screen_mode")
@@ -141,6 +145,8 @@ class SettingsRepository(private val context: Context) {
             showLauncherWifi = p[Keys.SHOW_LAUNCHER_WIFI] ?: true,
             doubleTapRefresh = p[Keys.DOUBLE_TAP_REFRESH] ?: false,
             launcherIconStyle = LauncherIconStyle.from(p[Keys.LAUNCHER_ICON_STYLE]),
+            iconPackPackage = p[Keys.ICON_PACK],
+            iconPackFallback = p[Keys.ICON_PACK_FALLBACK],
             appIconOverrides = parseIconOverrides(p[Keys.APP_ICON_OVERRIDES]),
             coverSlotMode = CoverSlotMode.from(p[Keys.COVER_SLOT_MODE]),
             sleepScreenMode = SleepScreenMode.from(p[Keys.SLEEP_SCREEN_MODE]),
@@ -215,6 +221,15 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setLauncherIconStyle(style: LauncherIconStyle) =
         context.launcherDataStore.edit { it[Keys.LAUNCHER_ICON_STYLE] = style.id }
+
+    suspend fun setIconPack(pkg: String?) = context.launcherDataStore.edit {
+        it[Keys.LAUNCHER_ICON_STYLE] = LauncherIconStyle.ICON_PACK.id
+        if (pkg == null) it.remove(Keys.ICON_PACK) else it[Keys.ICON_PACK] = pkg
+    }
+
+    suspend fun setIconPackFallback(pkg: String?) = context.launcherDataStore.edit {
+        if (pkg == null) it.remove(Keys.ICON_PACK_FALLBACK) else it[Keys.ICON_PACK_FALLBACK] = pkg
+    }
 
     suspend fun setAppIconOverride(appKey: String, icon: String?) =
         context.launcherDataStore.edit { p ->

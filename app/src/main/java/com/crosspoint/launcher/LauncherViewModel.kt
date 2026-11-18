@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -73,6 +76,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _readerApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val readerApps: StateFlow<List<AppInfo>> = _readerApps.asStateFlow()
+
+    private val iconPackRepo = com.crosspoint.launcher.data.IconPackRepository(app)
+    private val _iconPacks = MutableStateFlow<List<com.crosspoint.launcher.data.IconPack>>(emptyList())
+    val iconPacks: StateFlow<List<com.crosspoint.launcher.data.IconPack>> = _iconPacks.asStateFlow()
+
+    /** Icons from the chosen icon pack, keyed by "package/activity". */
+    private val _packIcons = MutableStateFlow<Map<String, androidx.compose.ui.graphics.ImageBitmap>>(emptyMap())
+    val packIcons: StateFlow<Map<String, androidx.compose.ui.graphics.ImageBitmap>> = _packIcons.asStateFlow()
 
     private val _storeApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val storeApps: StateFlow<List<AppInfo>> = _storeApps.asStateFlow()
@@ -129,6 +140,21 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // Reload pack icons only when the chosen packs or the installed apps change.
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                settings.map {
+                    if (it.launcherIconStyle != LauncherIconStyle.ICON_PACK) emptyList()
+                    else listOfNotNull(it.iconPackPackage, it.iconPackFallback).distinct()
+                }.distinctUntilChanged(),
+                apps
+            ) { packs, apps -> packs to apps }
+                .collectLatest { (packs, apps) ->
+                    // The main pack wins; the fallback pack fills in apps the main pack lacks.
+                    _packIcons.value = if (apps.isEmpty()) emptyMap()
+                        else packs.reversed().fold(emptyMap()) { icons, pack -> icons + iconPackRepo.loadIcons(pack, apps) }
+                }
+        }
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_TIME_TICK)
             addAction(Intent.ACTION_TIME_CHANGED)
@@ -176,6 +202,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             _apps.value = appRepo.loadLaunchableApps()
             _readerApps.value = appRepo.loadReaderApps()
             _storeApps.value = appRepo.loadStoreApps()
+            _iconPacks.value = iconPackRepo.installedPacks()
         }
     }
 
@@ -338,6 +365,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsRepo.setLastAppliedSleepCover(path) }
     fun setLauncherIconStyle(style: LauncherIconStyle) =
         viewModelScope.launch { settingsRepo.setLauncherIconStyle(style) }
+    fun setIconPack(pkg: String?) = viewModelScope.launch { settingsRepo.setIconPack(pkg) }
+    fun setIconPackFallback(pkg: String?) = viewModelScope.launch { settingsRepo.setIconPackFallback(pkg) }
     fun setAppIconOverride(appKey: String, icon: String?) =
         viewModelScope.launch { settingsRepo.setAppIconOverride(appKey, icon) }
     fun setCoverSlotMode(mode: CoverSlotMode) =

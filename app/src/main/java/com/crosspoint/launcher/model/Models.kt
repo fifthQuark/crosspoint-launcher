@@ -29,7 +29,9 @@ enum class LauncherIconStyle(val id: String, val label: String) {
     ICONS("icons", "Icons"),
     DOTS("dots", "Dots"),
     SQUARES("squares", "Squares"),
-    CIRCLES("circles", "Circles");
+    CIRCLES("circles", "Circles"),
+    /** The app's own icon, or its icon from an installed icon pack. */
+    ICON_PACK("iconpack", "Icon Pack");
 
     companion object {
         fun from(id: String?): LauncherIconStyle = entries.firstOrNull { it.id == id } ?: ICONS

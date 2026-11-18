@@ -94,6 +94,7 @@ fun SettingsScreen(
     val apps by vm.apps.collectAsState()
     val readerApps by vm.readerApps.collectAsState()
     val storeApps by vm.storeApps.collectAsState()
+    val iconPacks by vm.iconPacks.collectAsState()
     val syncStatus by vm.syncStatus.collectAsState()
     val syncBusy by vm.syncBusy.collectAsState()
     val hasStorage by vm.hasStorage.collectAsState()
@@ -282,17 +283,39 @@ fun SettingsScreen(
                             Row(Modifier.fillMaxWidth()) {
                                 LauncherIconStyle.entries.forEach { style ->
                                     Pressable(onClick = { vm.setLauncherIconStyle(style) }, modifier = Modifier.weight(1f)) {
-                                        Column(Modifier.fillMaxWidth().height(56.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                                        Column(Modifier.fillMaxWidth().heightIn(min = 56.dp), horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)) {
                                             RadioDot(settings.launcherIconStyle == style)
-                                            BodyText(style.label, size = 14)
+                                            BodyText(style.label, size = 14, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    item { BodyText("Layout", muted = true, size = 14, modifier = Modifier.padding(top = 4.dp)) }
+                    if (settings.launcherIconStyle == LauncherIconStyle.ICON_PACK) {
+                        item { SelectRow("App Icons", "Each app's own icon", settings.iconPackPackage == null) { vm.setIconPack(null) } }
+                        items(iconPacks, key = { "pack:${it.packageName}" }) { pack ->
+                            SelectRow(pack.label, "Icon pack", settings.iconPackPackage == pack.packageName) { vm.setIconPack(pack.packageName) }
+                        }
+                        if (iconPacks.isEmpty()) item {
+                            BodyText("No icon packs installed. Install one from your app store to see it here.", muted = true, size = 13, maxLines = Int.MAX_VALUE, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
+                        }
+                        val fallbacks = iconPacks.filter { it.packageName != settings.iconPackPackage }
+                        if (settings.iconPackPackage != null && fallbacks.isNotEmpty()) {
+                            item {
+                                Column(Modifier.padding(top = 12.dp, start = 6.dp)) {
+                                    BodyText("Fallback Icon Pack", weight = FontWeight.Bold, size = 14, muted = true)
+                                    BodyText("For apps the icon pack above doesn't cover", muted = true, size = 12, maxLines = Int.MAX_VALUE)
+                                }
+                            }
+                            item { SelectRow("App Icons", "Each app's own icon", settings.iconPackFallback == null) { vm.setIconPackFallback(null) } }
+                            items(fallbacks, key = { "fallback:${it.packageName}" }) { pack ->
+                                SelectRow(pack.label, "Icon pack", settings.iconPackFallback == pack.packageName) { vm.setIconPackFallback(pack.packageName) }
+                            }
+                        }
+                    }
+                    item { BodyText("Layout", muted = true, size = 14, modifier = Modifier.padding(top = 12.dp)) }
                     item {
                         StepperRow("Columns", if (settings.homeColumns == 0) "Theme Default" else "${settings.homeColumns}",
                             canDecrease = settings.homeColumns > 0,

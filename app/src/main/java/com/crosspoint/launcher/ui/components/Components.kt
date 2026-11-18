@@ -275,20 +275,29 @@ fun BookCover(
     }
 }
 
+/** Icons from the chosen icon pack, keyed by "package/activity" (empty when none is chosen). */
+val LocalPackIcons = androidx.compose.runtime.staticCompositionLocalOf<Map<String, ImageBitmap>> { emptyMap() }
+
+/** The icon to show for [app]: its icon-pack icon when one exists, otherwise its own icon. */
+@Composable
+fun appIconBitmap(app: AppInfo): ImageBitmap? = LocalPackIcons.current[app.key] ?: app.icon
+
 /** App icon rendered as a B&W mono glyph by default to fit the e-ink aesthetic. */
 @Composable
 fun AppIcon(
     icon: ImageBitmap?,
     contentDescription: String,
     size: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    colorFilter: androidx.compose.ui.graphics.ColorFilter? = null
 ) {
     val colors = CrossPointTheme.colors
     if (icon != null) {
         Image(
             bitmap = icon,
             contentDescription = contentDescription,
-            modifier = modifier.size(size)
+            modifier = modifier.size(size),
+            colorFilter = colorFilter
         )
     } else {
         Box(
@@ -314,6 +323,17 @@ fun LauncherAppIcon(
                 AppIcon(app.icon, app.label, size, modifier)
             } else {
                 LucideIcon(override ?: defaultIconForApp(app), modifier.size(size))
+            }
+        }
+        LauncherIconStyle.ICON_PACK -> {
+            val override = settings.appIconOverrides[app.key]
+            if (override != null) {
+                LucideIcon(override, modifier.size(size))
+            } else {
+                // Full-color icons only in Color mode; otherwise gray, matching covers on e-ink.
+                val filter = if (CrossPointTheme.imageColorMode == com.crosspoint.launcher.model.ImageColorMode.COLOR) null
+                    else remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }) }
+                AppIcon(appIconBitmap(app), app.label, size, modifier, filter)
             }
         }
         LauncherIconStyle.DOTS -> Box(
