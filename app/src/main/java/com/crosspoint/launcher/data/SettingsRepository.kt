@@ -24,6 +24,7 @@ data class LauncherSettings(
     val appearance: AppearanceMode = AppearanceMode.LIGHT,
     val imageColorMode: ImageColorMode = ImageColorMode.DITHERED,
     val defaultReaderPackage: String? = null,
+    val appStorePackage: String? = null,                 // null = Aurora Store when installed
     val pinnedApps: List<String> = emptyList(),          // "package/activity" entries
     val homeMenuItems: List<HomeMenuItem> = DEFAULT_MENU,
     val homeItemOrder: List<String>? = null,
@@ -76,6 +77,7 @@ class SettingsRepository(private val context: Context) {
         val APPEARANCE = stringPreferencesKey("appearance")
         val IMAGE_COLOR_MODE = stringPreferencesKey("image_color_mode")
         val DEFAULT_READER = stringPreferencesKey("default_reader")
+        val APP_STORE = stringPreferencesKey("app_store")
         val PINNED = stringSetPreferencesKey("pinned_apps")          // unordered set
         val PINNED_ORDER = stringPreferencesKey("pinned_order")      // ordered csv
         val MENU = stringPreferencesKey("home_menu")                 // ordered csv of ids
@@ -114,6 +116,7 @@ class SettingsRepository(private val context: Context) {
             appearance = AppearanceMode.from(p[Keys.APPEARANCE]),
             imageColorMode = ImageColorMode.from(p[Keys.IMAGE_COLOR_MODE]),
             defaultReaderPackage = p[Keys.DEFAULT_READER],
+            appStorePackage = p[Keys.APP_STORE],
             pinnedApps = pinned,
             homeMenuItems = menu,
             homeItemOrder = p[Keys.HOME_ORDER]?.split("\n")?.filter { it.isNotBlank() },
@@ -148,6 +151,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setDefaultReader(pkg: String?) = context.launcherDataStore.edit {
         if (pkg == null) it.remove(Keys.DEFAULT_READER) else it[Keys.DEFAULT_READER] = pkg
+    }
+
+    suspend fun setAppStore(pkg: String?) = context.launcherDataStore.edit {
+        if (pkg == null) it.remove(Keys.APP_STORE) else it[Keys.APP_STORE] = pkg
     }
 
     suspend fun setHomeItems(entries: List<String>) = context.launcherDataStore.edit { p ->

@@ -46,6 +46,16 @@ class AppRepository(private val context: Context) {
             .sortedBy { it.label.lowercase() }
     }
 
+    /** Apps that open store listings (market:// links), e.g. Play Store, Aurora Store, F-Droid. */
+    suspend fun loadStoreApps(): List<AppInfo> = withContext(Dispatchers.IO) {
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
+        queryActivities(intent)
+            .filter { it.activityInfo.packageName != context.packageName }
+            .distinctBy { it.activityInfo.packageName }
+            .map { info -> info.toAppInfo().let { it.copy(label = appLabel(it.packageName) ?: it.label) } }
+            .sortedBy { it.label.lowercase() }
+    }
+
     fun appLabel(packageName: String): String? = try {
         pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
     } catch (e: PackageManager.NameNotFoundException) {

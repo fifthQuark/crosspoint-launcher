@@ -93,6 +93,7 @@ fun SettingsScreen(
     val settings by vm.settings.collectAsState()
     val apps by vm.apps.collectAsState()
     val readerApps by vm.readerApps.collectAsState()
+    val storeApps by vm.storeApps.collectAsState()
     val syncStatus by vm.syncStatus.collectAsState()
     val syncBusy by vm.syncBusy.collectAsState()
     val hasStorage by vm.hasStorage.collectAsState()
@@ -118,7 +119,9 @@ fun SettingsScreen(
     }
 
     var category by remember { mutableStateOf<String?>(null) }
-    val storeInstalled = apps.any { it.packageName == AuroraInstaller.PACKAGE }
+    val launchable = remember(apps) { apps.associateBy { it.packageName } }
+    // The chosen store, falling back to Aurora Store as before when none was chosen.
+    val storeApp = (settings.appStorePackage ?: AuroraInstaller.PACKAGE).let { launchable[it] }
     val scope = rememberCoroutineScope()
     val books by vm.books.collectAsState()
     val recentBook = remember(books, settings.lastOpenedBookPath) {
@@ -181,8 +184,8 @@ fun SettingsScreen(
     val categories = listOf(
         "Home Theme" to "layout_grid", "Appearance" to "sun",
         "App Search" to "search", "CrossPoint Sync" to "crosspoint", "Default Reader" to "book_open",
-        "Home Screen Items" to "rows_3", "OPDS Catalogs" to "library",
-        "Library" to "folder_open", (if (storeInstalled) "App Store" else "Get App Store") to "store",
+        "Default App Store" to "shopping_bag", "Home Screen Items" to "rows_3", "OPDS Catalogs" to "library",
+        "Library" to "folder_open", (if (storeApp != null) "App Store" else "Get App Store") to "store",
         "Device Settings" to "settings"
     )
     androidx.activity.compose.BackHandler(category != null) { category = null }
@@ -200,7 +203,7 @@ fun SettingsScreen(
                 items(categories) { (title, icon) ->
                     Pressable(onClick = {
                         when (title) {
-                            "App Store" -> Launching.launchPackage(context, AuroraInstaller.PACKAGE)
+                            "App Store" -> storeApp?.let { Launching.launchPackage(context, it.packageName) }
                             "Get App Store" -> getStore()
                             else -> category = title
                         }
@@ -298,6 +301,22 @@ fun SettingsScreen(
                         HomeItemSettingsRow(entry, settings, entries, { vm.setHomeItems(it) }, {
                             if (entry is LauncherColumnItem.PinnedApp) editingIconFor = entry.app
                         })
+                    }
+                }
+                "Default App Store" -> {
+                    item { BodyText("Settings > App Store opens this app.", muted = true, size = 14, maxLines = Int.MAX_VALUE, modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp)) }
+                    item { SelectRow("Automatic", "Aurora Store when installed", settings.appStorePackage == null) { vm.setAppStore(null) } }
+                    val stores = storeApps.filter { it.packageName in launchable }
+                    items(stores, key = { "store:${it.packageName}" }) { app ->
+                        SelectRow(app.label, app.packageName, settings.appStorePackage == app.packageName) { vm.setAppStore(app.packageName) }
+                    }
+                    val storePackages = stores.map { it.packageName }.toSet()
+                    val others = apps.filter { it.packageName !in storePackages }.distinctBy { it.packageName }
+                    if (others.isNotEmpty()) item {
+                        BodyText("Other Apps", weight = FontWeight.Bold, size = 14, muted = true, modifier = Modifier.padding(top = 12.dp, start = 6.dp))
+                    }
+                    items(others, key = { "other:${it.packageName}" }) { app ->
+                        SelectRow(app.label, app.packageName, settings.appStorePackage == app.packageName) { vm.setAppStore(app.packageName) }
                     }
                 }
                 "OPDS Catalogs" -> item { ActionRow("OPDS Servers", "${opdsServers.size} configured", "library", onOpenOpdsServers) }

@@ -74,6 +74,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val _readerApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val readerApps: StateFlow<List<AppInfo>> = _readerApps.asStateFlow()
 
+    private val _storeApps = MutableStateFlow<List<AppInfo>>(emptyList())
+    val storeApps: StateFlow<List<AppInfo>> = _storeApps.asStateFlow()
+
     private val _books = MutableStateFlow<List<Book>>(emptyList())
     val books: StateFlow<List<Book>> = _books.asStateFlow()
 
@@ -172,6 +175,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         appsJob = viewModelScope.launch {
             _apps.value = appRepo.loadLaunchableApps()
             _readerApps.value = appRepo.loadReaderApps()
+            _storeApps.value = appRepo.loadStoreApps()
         }
     }
 
@@ -309,6 +313,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             android.widget.Toast.makeText(getApplication(), "Home can show up to 5 items", android.widget.Toast.LENGTH_SHORT).show()
         } else settingsRepo.setHomeItems(if (entry in selected) selected - entry else selected + entry)
     }
+    fun setAppStore(pkg: String?) = viewModelScope.launch { settingsRepo.setAppStore(pkg) }
     fun setHomeItems(entries: List<String>) = viewModelScope.launch { settingsRepo.setHomeItems(entries) }
     fun setSearchGesture(g: com.crosspoint.launcher.model.SearchGesture) =
         viewModelScope.launch { settingsRepo.setSearchGesture(g) }
