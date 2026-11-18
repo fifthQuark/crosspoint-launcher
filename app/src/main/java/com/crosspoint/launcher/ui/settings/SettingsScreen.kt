@@ -3,6 +3,7 @@ package com.crosspoint.launcher.ui.settings
 import com.crosspoint.launcher.ui.components.ScrollList
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -115,7 +116,8 @@ fun SettingsScreen(
                 vm.setAppIconOverride(app.key, null)
                 editingIconFor = null
             },
-            onBack = { editingIconFor = null }
+            onBack = { editingIconFor = null },
+            packs = iconPacks
         )
         return
     }
@@ -427,21 +429,34 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Chooses an app's icon: a built-in Lucide icon, or ([packs]) any icon from an installed icon
+ * pack, stored as "pack:<package>:<drawable>".
+ */
 @Composable
-private fun IconPickerScreen(
+internal fun IconPickerScreen(
     app: AppInfo,
     selected: String,
     onSelect: (String) -> Unit,
     onReset: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    packs: List<com.crosspoint.launcher.data.IconPack> = emptyList()
 ) {
     val colors = CrossPointTheme.colors
     val m = CrossPointTheme.metrics
+    val context = LocalContext.current
     val topPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var query by remember { mutableStateOf("") }
+    // null = the built-in icons; otherwise the package of the icon pack being browsed.
+    var source by remember { mutableStateOf(com.crosspoint.launcher.data.IconPackRepository.parseSpec(selected)?.first?.takeIf { pkg -> packs.any { it.packageName == pkg } }) }
     val filtered = remember(query) {
         if (query.isBlank()) LucideIconLibrary
         else LucideIconLibrary.filter { it.contains(query.trim(), ignoreCase = true) }
+    }
+    var packIcons by remember(source) { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(source) {
+        val pack = source ?: return@LaunchedEffect
+        packIcons = com.crosspoint.launcher.data.IconPackRepository(context.applicationContext).iconNames(pack)
     }
     Column(Modifier.fillMaxSize().padding(top = topPad)) {
         ScreenHeader("Choose Icon", onBack) {
@@ -452,6 +467,21 @@ private fun IconPickerScreen(
             }
         }
         BodyText(app.label, muted = true, size = 14, modifier = Modifier.padding(horizontal = m.contentSidePadding, vertical = 8.dp))
+        if (packs.isNotEmpty()) Row(
+            Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = m.contentSidePadding),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            (listOf<com.crosspoint.launcher.data.IconPack?>(null) + packs).forEach { pack ->
+                val active = source == pack?.packageName
+                Pressable(onClick = { source = pack?.packageName }) {
+                    BodyText(pack?.label ?: "Built-in", weight = if (active) FontWeight.Bold else FontWeight.Normal, size = 14,
+                        color = if (active) colors.background else null,
+                        modifier = Modifier.then(if (active) Modifier.background(colors.onBackground, RoundedCornerShape(16.dp)) else Modifier)
+                            .border(1.dp, colors.divider, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
+                }
+            }
+        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = m.contentSidePadding, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -470,6 +500,31 @@ private fun IconPickerScreen(
                     inner()
                 }
             )
+        }
+        val pack = source
+        if (pack != null) {
+            val names = packIcons
+            val shown = remember(names, query) {
+                names.orEmpty().filter { query.isBlank() || it.replace('_', ' ').contains(query.trim(), ignoreCase = true) }
+            }
+            if (names == null) BodyText("Loading icons…", muted = true, size = 14, modifier = Modifier.padding(horizontal = m.contentSidePadding))
+            else androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(72.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = m.contentSidePadding, vertical = 8.dp)
+            ) {
+                items(shown.size, key = { shown[it] }) { i ->
+                    val spec = com.crosspoint.launcher.data.IconPackRepository.spec(pack, shown[i])
+                    Pressable(onClick = { onSelect(spec) }) {
+                        Box(Modifier.size(72.dp).then(if (spec == selected) Modifier.border(2.dp, colors.divider, RoundedCornerShape(8.dp)) else Modifier),
+                            contentAlignment = Alignment.Center) {
+                            com.crosspoint.launcher.ui.components.AppIcon(com.crosspoint.launcher.ui.components.rememberPackIcon(spec),
+                                shown[i], 44.dp, colorFilter = com.crosspoint.launcher.ui.components.iconColorFilter())
+                        }
+                    }
+                }
+            }
+            return@Column
         }
         ScrollList(
             modifier = Modifier.fillMaxSize(),

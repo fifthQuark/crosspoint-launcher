@@ -278,6 +278,25 @@ fun BookCover(
 /** Icons from the chosen icon pack, keyed by "package/activity" (empty when none is chosen). */
 val LocalPackIcons = androidx.compose.runtime.staticCompositionLocalOf<Map<String, ImageBitmap>> { emptyMap() }
 
+/** Gray for e-ink color modes; null (full color) when covers are shown in Color. */
+@Composable
+fun iconColorFilter(): androidx.compose.ui.graphics.ColorFilter? =
+    if (CrossPointTheme.imageColorMode == com.crosspoint.launcher.model.ImageColorMode.COLOR) null
+    else remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }) }
+
+/** An icon chosen by hand from an icon pack ("pack:<package>:<drawable>"), loaded off the main thread. */
+@Composable
+fun rememberPackIcon(spec: String): ImageBitmap? {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var icon by remember(spec) { mutableStateOf(com.crosspoint.launcher.data.IconPackRepository.peekSpec(spec)) }
+    LaunchedEffect(spec) {
+        if (icon == null) icon = withContext(Dispatchers.IO) {
+            com.crosspoint.launcher.data.IconPackRepository(context.applicationContext).loadSpec(spec)
+        }
+    }
+    return icon
+}
+
 /** The icon to show for [app]: its icon-pack icon when one exists, otherwise its own icon. */
 @Composable
 fun appIconBitmap(app: AppInfo): ImageBitmap? = LocalPackIcons.current[app.key] ?: app.icon
@@ -316,9 +335,15 @@ fun LauncherAppIcon(
     modifier: Modifier = Modifier
 ) {
     val colors = CrossPointTheme.colors
+    val override = settings.appIconOverrides[app.key]
+    // An icon picked from a pack shows in every style that draws icons.
+    if (override != null && com.crosspoint.launcher.data.IconPackRepository.isSpec(override) &&
+        (settings.launcherIconStyle == LauncherIconStyle.ICONS || settings.launcherIconStyle == LauncherIconStyle.ICON_PACK)) {
+        AppIcon(rememberPackIcon(override) ?: app.icon, app.label, size, modifier, iconColorFilter())
+        return
+    }
     when (settings.launcherIconStyle) {
         LauncherIconStyle.ICONS -> {
-            val override = settings.appIconOverrides[app.key]
             if (override == null && app.icon != null && (app.packageName.startsWith("com.wetao.") || app.packageName == "com.android.settings")) {
                 AppIcon(app.icon, app.label, size, modifier)
             } else {
@@ -326,14 +351,11 @@ fun LauncherAppIcon(
             }
         }
         LauncherIconStyle.ICON_PACK -> {
-            val override = settings.appIconOverrides[app.key]
             if (override != null) {
                 LucideIcon(override, modifier.size(size))
             } else {
                 // Full-color icons only in Color mode; otherwise gray, matching covers on e-ink.
-                val filter = if (CrossPointTheme.imageColorMode == com.crosspoint.launcher.model.ImageColorMode.COLOR) null
-                    else remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }) }
-                AppIcon(appIconBitmap(app), app.label, size, modifier, filter)
+                AppIcon(appIconBitmap(app), app.label, size, modifier, iconColorFilter())
             }
         }
         LauncherIconStyle.DOTS -> Box(

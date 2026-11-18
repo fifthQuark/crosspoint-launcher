@@ -45,6 +45,21 @@ class IconPackRepository(private val context: Context) {
         }.toMap()
     }
 
+    /** Every icon name [packPackage] maps an app to, for choosing an icon by hand. */
+    suspend fun iconNames(packPackage: String): List<String> = withContext(Dispatchers.IO) {
+        val res = runCatching { pm.getResourcesForApplication(packPackage) }.getOrNull() ?: return@withContext emptyList()
+        runCatching { readAppFilter(res, packPackage) }.getOrDefault(emptyMap()).values.distinct().sorted()
+    }
+
+    /** One icon by [spec] ("pack:<package>:<drawable>"), cached; null if the pack or icon is gone. */
+    fun loadSpec(spec: String): ImageBitmap? {
+        PackIconCache.get(spec)?.let { return it }
+        val (pkg, name) = parseSpec(spec) ?: return null
+        val res = runCatching { pm.getResourcesForApplication(pkg) }.getOrNull() ?: return null
+        return runCatching { loadDrawable(res, pkg, name)?.toImageBitmap(iconSize) }.getOrNull()
+            ?.also { PackIconCache.put(spec, it) }
+    }
+
     private fun loadDrawable(res: Resources, pkg: String, name: String): android.graphics.drawable.Drawable? {
         @Suppress("DiscouragedApi")
         val id = res.getIdentifier(name, "drawable", pkg).takeIf { it != 0 }
@@ -64,6 +79,16 @@ class IconPackRepository(private val context: Context) {
     }
 
     companion object {
+        /** An app icon override that points into an icon pack rather than at a Lucide icon. */
+        fun spec(packPackage: String, drawable: String) = "pack:$packPackage:$drawable"
+        fun isSpec(value: String) = value.startsWith("pack:")
+        fun parseSpec(spec: String): Pair<String, String>? =
+            spec.removePrefix("pack:").split(':', limit = 2).takeIf { isSpec(spec) && it.size == 2 }?.let { it[0] to it[1] }
+
+        // Icons picked by hand from packs, shared by every screen that shows them.
+        private val PackIconCache = android.util.LruCache<String, ImageBitmap>(256)
+        fun peekSpec(spec: String): ImageBitmap? = PackIconCache.get(spec)
+
         private val PACK_ACTIONS = listOf(
             "org.adw.launcher.THEMES",
             "com.novalauncher.THEME",

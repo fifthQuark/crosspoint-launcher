@@ -32,7 +32,8 @@ fun AppContextMenu(
     pinned: Boolean,
     onTogglePin: () -> Unit,
     onAppInfo: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onChangeIcon: (() -> Unit)? = null
 ) {
     val colors = CrossPointTheme.colors
     Dialog(onDismissRequest = onDismiss) {
@@ -55,6 +56,10 @@ fun AppContextMenu(
             Box(Modifier.fillMaxWidth().height(1.dp).background(colors.divider))
             MenuRow(if (pinned) "pin_off" else "pin", if (pinned) "Unpin" else "Pin") {
                 onTogglePin()
+                onDismiss()
+            }
+            if (onChangeIcon != null) MenuRow("image", "Change icon") {
+                onChangeIcon()
                 onDismiss()
             }
             MenuRow("info", "App info") {

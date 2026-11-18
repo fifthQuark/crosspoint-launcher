@@ -50,7 +50,8 @@ fun AppDrawer(
     onTogglePin: (String) -> Unit,
     onAppInfo: (String) -> Unit,
     onOpenSettings: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onChangeIcon: ((AppInfo) -> Unit)? = null
 ) {
     val colors = CrossPointTheme.colors
     val m = CrossPointTheme.metrics
@@ -118,7 +119,8 @@ fun AppDrawer(
                 pinned = pinnedKeys.contains(key) || pinnedKeys.contains(app.packageName),
                 onTogglePin = { onTogglePin(key) },
                 onAppInfo = { onAppInfo(app.packageName) },
-                onDismiss = { appMenu = null }
+                onDismiss = { appMenu = null },
+                onChangeIcon = onChangeIcon?.let { change -> { change(app) } }
             )
         }
     }

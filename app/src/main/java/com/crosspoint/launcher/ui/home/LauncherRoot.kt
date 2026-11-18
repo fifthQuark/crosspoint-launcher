@@ -57,6 +57,8 @@ fun LauncherRoot(
     var pagePosition by rememberSaveable { mutableStateOf(0) }
     var bannerDismissed by rememberSaveable { mutableStateOf(false) }
     var bookMenu by remember { mutableStateOf<com.crosspoint.launcher.model.Book?>(null) }
+    var appMenu by remember { mutableStateOf<com.crosspoint.launcher.model.AppInfo?>(null) }
+    var iconPickerFor by remember { mutableStateOf<com.crosspoint.launcher.model.AppInfo?>(null) }
 
     // HOME button pressed while in the app -> always go back to the home screen.
     LaunchedEffect(homeResetSignal) { if (homeResetSignal > 0) screen = Screen.HOME }
@@ -72,6 +74,7 @@ fun LauncherRoot(
     val booksLoading by vm.booksLoading.collectAsState()
     val externalReading by vm.externalReading.collectAsState()
     val opdsServers by vm.opdsServers.collectAsState()
+    val iconPacks by vm.iconPacks.collectAsState()
 
     // Sleep screen set to "Book Cover" tracks the most recent book automatically.
     if (settings.sleepScreenMode == com.crosspoint.launcher.model.SleepScreenMode.BOOK_COVER) {
@@ -259,7 +262,7 @@ fun LauncherRoot(
                     onBookLongPress = { bookMenu = it },
                     onLaunchApp = launchApp,
                     onOpenExternalReading = { vm.launchExternalReading(it) },
-                    onAppInfo = { Launching.openAppInfo(context, it.packageName) },
+                    onAppInfo = { appMenu = it },
                     onOpenDrawer = { screen = Screen.DRAWER },
                     onOpenSettings = { screen = Screen.SETTINGS },
                     onPickWidget = onPickWidget,
@@ -284,7 +287,8 @@ fun LauncherRoot(
                 onTogglePin = { vm.togglePinned(it) },
                 onAppInfo = { Launching.openAppInfo(context, it) },
                 onOpenSettings = { screen = Screen.SETTINGS },
-                onBack = { screen = Screen.HOME }
+                onBack = { screen = Screen.HOME },
+                onChangeIcon = { iconPickerFor = it }
             )
             Screen.SETTINGS -> SettingsScreen(
                 vm = vm,
@@ -331,6 +335,32 @@ fun LauncherRoot(
                 hiddenItems = HomeMenuItem.entries.filter { it != HomeMenuItem.APPS && it !in effectiveMenu },
                 onOpenItem = onMenu
             )
+        }
+
+        // Long-pressing an app on Home offers its icon, removal from Home, and App info.
+        appMenu?.let { app ->
+            com.crosspoint.launcher.ui.drawer.AppContextMenu(
+                app = app,
+                pinned = true,
+                onTogglePin = { vm.togglePinned("${app.packageName}/${app.activityName}") },
+                onAppInfo = { Launching.openAppInfo(context, app.packageName) },
+                onDismiss = { appMenu = null },
+                onChangeIcon = { iconPickerFor = app }
+            )
+        }
+        iconPickerFor?.let { app ->
+            val key = "${app.packageName}/${app.activityName}"
+            BackHandler { iconPickerFor = null }
+            Box(Modifier.fillMaxSize().background(colors.background)) {
+                com.crosspoint.launcher.ui.settings.IconPickerScreen(
+                    app = app,
+                    selected = settings.appIconOverrides[key] ?: com.crosspoint.launcher.ui.components.defaultIconForApp(app),
+                    onSelect = { vm.setAppIconOverride(key, it); iconPickerFor = null },
+                    onReset = { vm.setAppIconOverride(key, null); iconPickerFor = null },
+                    onBack = { iconPickerFor = null },
+                    packs = iconPacks
+                )
+            }
         }
 
         bookMenu?.let { book ->
