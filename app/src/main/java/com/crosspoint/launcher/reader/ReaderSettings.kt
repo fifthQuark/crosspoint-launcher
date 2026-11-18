@@ -31,6 +31,14 @@ class ReaderSettings(private val prefs: SharedPreferences) {
     fun set(setting: Setting, index: Int) = prefs.edit().putInt(setting.key, setting.values[index.coerceIn(0, setting.values.lastIndex)]).apply()
     fun label(setting: Setting) = setting.labels[index(setting)]
 
+    /** Whether pages are white on black now; Follow Android Theme tracks the system's dark theme and its schedule. */
+    fun night(context: Context): Boolean = when (get(NIGHT_MODE)) {
+        NIGHT_OFF -> false
+        NIGHT_FOLLOW_SYSTEM -> context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        else -> true
+    }
+
     var fontFamily: String
         get() = prefs.getString("font_family", null)?.let { LEGACY_FONTS[it] ?: it } ?: BUNDLED_FONTS.keys.first()
         set(value) = prefs.edit().putString("font_family", value).apply()
@@ -148,7 +156,10 @@ class ReaderSettings(private val prefs: SharedPreferences) {
         // --- Display (Settings button) ---
         val CONTINUOUS_SCROLL = Setting("continuous_scroll", "Continuous Scroll", OFF_ON, 0, icon = "scroll_text")
         val ORIENTATION = Setting("orientation", "Orientation", listOf("Follow device", "Portrait", "Landscape", "Portrait (inverted)", "Landscape (reversed)"), 0, icon = "rotate_cw")
-        val NIGHT_MODE = Setting("night_mode", "Night Mode", OFF_ON, 0, icon = "moon")
+        // Stored values 0/1 match the earlier Off/On toggle.
+        const val NIGHT_OFF = 0
+        const val NIGHT_FOLLOW_SYSTEM = 2
+        val NIGHT_MODE = Setting("night_mode", "Night Mode", listOf("Off", "On", "Follow Android Theme"), 0, icon = "moon")
         val REFRESH = Setting("refresh_frequency", "Full Refresh", listOf("Every page", "Every 5 pages", "Every 10 pages", "Every 15 pages", "Every 30 pages", "Never"), 5, listOf(1, 5, 10, 15, 30, 0), icon = "rotate_cw")
         val KEEP_AWAKE = Setting("keep_screen", "Keep Screen On", OFF_ON, 0, icon = "eye")
 

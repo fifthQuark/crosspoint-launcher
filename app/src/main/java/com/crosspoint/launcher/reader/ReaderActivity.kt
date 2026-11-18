@@ -283,7 +283,7 @@ class ReaderActivity : ComponentActivity(), ReaderPanelHost {
                 val metrics = resources.displayMetrics
                 val spec = ReaderText.Page((scroll.width.takeIf { it > 0 } ?: metrics.widthPixels) - text.paddingLeft - text.paddingRight,
                     (scroll.height.takeIf { it > 0 } ?: metrics.heightPixels) - text.paddingTop - text.paddingBottom,
-                    text.textSize, text.currentTextColor, settings.on(S.NIGHT_MODE), text.paint.measureText(" "), text.lineHeight)
+                    text.textSize, text.currentTextColor, settings.night(this@ReaderActivity), text.paint.measureText(" "), text.lineHeight)
                 val (content, mapping, ids, breaks) = withContext(Dispatchers.IO) {
                     val html = current.chapterHtml(index)
                     ReaderText.render(html, current, index, settings, spec, resources)
@@ -439,7 +439,7 @@ class ReaderActivity : ComponentActivity(), ReaderPanelHost {
     private fun applyHighlights() {
         val content = text.text as? Spannable ?: return
         content.getSpans(0, content.length, ClipHighlight::class.java).forEach(content::removeSpan)
-        val color = if (settings.on(S.NIGHT_MODE)) 0xFF555555.toInt() else 0xFFCCCCCC.toInt()
+        val color = if (settings.night(this@ReaderActivity)) 0xFF555555.toInt() else 0xFFCCCCCC.toInt()
         highlightRanges().forEach { (_, range) -> content.setSpan(ClipHighlight(color), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
     }
 
@@ -744,7 +744,7 @@ class ReaderActivity : ComponentActivity(), ReaderPanelHost {
         scroll.keepScreenOn = settings.on(S.KEEP_AWAKE)
         val orientation = ORIENTATIONS[settings.index(S.ORIENTATION)]
         if (requestedOrientation != orientation) requestedOrientation = orientation
-        val night = settings.on(S.NIGHT_MODE)
+        val night = settings.night(this@ReaderActivity)
         val foreground = if (night) Color.WHITE else Color.BLACK
         page.setBackgroundColor(if (night) Color.BLACK else Color.WHITE)
         mask.setBackgroundColor(if (night) Color.BLACK else Color.WHITE)
@@ -790,7 +790,7 @@ class ReaderActivity : ComponentActivity(), ReaderPanelHost {
         val pageNumber = if (paged) pageIndex() + 1 else ((scroll.scrollY + step - 1) / step + 1).coerceAtMost(pages)
         val title = when (settings[S.STATUS_TITLE]) { 0 -> current?.title.orEmpty(); 1 -> if (current != null && ready) chapterTitle() else ""; else -> "" }
         statusBar.bind(settings, ReaderStatusBar.State(title, pageNumber, pages, bookPercent(), battery, pageBookmark() != null),
-            if (settings.on(S.NIGHT_MODE)) Color.WHITE else Color.BLACK)
+            if (settings.night(this@ReaderActivity)) Color.WHITE else Color.BLACK)
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
