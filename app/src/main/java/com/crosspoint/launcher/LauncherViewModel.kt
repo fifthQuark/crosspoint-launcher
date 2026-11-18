@@ -359,6 +359,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsRepo.setShowLauncherWifi(v) }
     fun setDoubleTapRefresh(v: Boolean) =
         viewModelScope.launch { settingsRepo.setDoubleTapRefresh(v) }
+    fun setHomeBackgroundVersion(version: Long) =
+        viewModelScope.launch { settingsRepo.setHomeBackgroundVersion(version) }
     fun setSleepScreenMode(mode: com.crosspoint.launcher.model.SleepScreenMode) =
         viewModelScope.launch { settingsRepo.setSleepScreenMode(mode) }
     fun setLastAppliedSleepCover(path: String) =

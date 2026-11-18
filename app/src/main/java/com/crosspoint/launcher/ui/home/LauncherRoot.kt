@@ -180,7 +180,7 @@ fun LauncherRoot(
     Box(Modifier.fillMaxSize().background(colors.background).then(statsSwipe)) {
         when (screen) {
             Screen.STATS -> com.crosspoint.launcher.ui.stats.StatsScreen(onBack = { screen = Screen.HOME })
-            Screen.HOME -> androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().then(homeGestureModifier)) {
+            Screen.HOME -> androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().homeBackground(settings.homeBackgroundVersion).then(homeGestureModifier)) {
               if (!isDefaultHome && !bannerDismissed) {
                 DefaultHomeBanner(
                     onSet = onRequestDefaultHome,

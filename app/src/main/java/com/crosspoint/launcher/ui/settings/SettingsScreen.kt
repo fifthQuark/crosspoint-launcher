@@ -132,6 +132,13 @@ fun SettingsScreen(
     val pickSleepImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) scope.launch { withContext(Dispatchers.Default) { SleepScreen.applyUri(context, uri) } }
     }
+    val pickHomeBackground = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            val saved = withContext(Dispatchers.IO) { runCatching { com.crosspoint.launcher.util.HomeBackground.save(context, uri) }.getOrDefault(false) }
+            if (saved) vm.setHomeBackgroundVersion(System.currentTimeMillis())
+            else android.widget.Toast.makeText(context, "Couldn't open that image", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     var storeStatus by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf(false) }
     // Download, verify and hand an APK to the system installer, reporting progress through setStatus.
@@ -228,6 +235,20 @@ fun SettingsScreen(
                         SelectRow(mode.label, mode.description, settings.imageColorMode == mode) { vm.setImageColorMode(mode) }
                     }
                     items(CoverSlotMode.entries) { mode -> SelectRow(mode.label, "Cover area", settings.coverSlotMode == mode) { vm.setCoverSlotMode(mode) } }
+                    if (imagePickerAvailable || settings.homeBackgroundVersion > 0) item {
+                        BodyText("Home Background", weight = FontWeight.Bold, size = 14, muted = true, modifier = Modifier.padding(top = 12.dp, start = 6.dp))
+                    }
+                    if (imagePickerAvailable) item {
+                        ActionRow(if (settings.homeBackgroundVersion > 0) "Change Image" else "Choose Image", "Shown behind the Home screen", "image") {
+                            pickHomeBackground.launch("image/*")
+                        }
+                    }
+                    if (settings.homeBackgroundVersion > 0) item {
+                        ActionRow("Remove Image", "", "x") {
+                            com.crosspoint.launcher.util.HomeBackground.clear(context)
+                            vm.setHomeBackgroundVersion(0L)
+                        }
+                    }
                     if (settings.coverSlotMode == CoverSlotMode.WIDGET) {
                         item { ActionRow("Choose Widget", "", "app_window", onPickWidget) }
                         item { ActionRow("Clear Widget", "", "x", onClearWidget) }

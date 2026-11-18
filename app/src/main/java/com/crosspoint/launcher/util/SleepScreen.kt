@@ -32,7 +32,7 @@ object SleepScreen {
     }
 
     /** Centre-crops [source] to the w:h panel aspect, then scales to fill it exactly (no stretch, no bars). */
-    private fun fillCrop(source: Bitmap, w: Int, h: Int): Bitmap {
+    internal fun fillCrop(source: Bitmap, w: Int, h: Int): Bitmap {
         val targetAspect = w.toFloat() / h
         val src = if (source.width.toFloat() / source.height > targetAspect) {
             val cropW = (source.height * targetAspect).toInt()

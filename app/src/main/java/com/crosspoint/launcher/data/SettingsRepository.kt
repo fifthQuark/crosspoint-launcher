@@ -45,6 +45,7 @@ data class LauncherSettings(
     val iconPackFallback: String? = null,                // used for apps the main pack lacks
     val appIconOverrides: Map<String, String> = emptyMap(),
     val coverSlotMode: CoverSlotMode = CoverSlotMode.BOOKS,
+    val homeBackgroundVersion: Long = 0L,                // 0 = no background image
     val sleepScreenMode: SleepScreenMode = SleepScreenMode.OFF,
     val lastAppliedSleepCover: String = "",
     val coverWidgetId: Int = -1,
@@ -107,6 +108,7 @@ class SettingsRepository(private val context: Context) {
         val ICON_PACK_FALLBACK = stringPreferencesKey("icon_pack_fallback")
         val APP_ICON_OVERRIDES = stringPreferencesKey("app_icon_overrides")
         val COVER_SLOT_MODE = stringPreferencesKey("cover_slot_mode")
+        val HOME_BACKGROUND = androidx.datastore.preferences.core.longPreferencesKey("home_background")
         val SLEEP_SCREEN_MODE = stringPreferencesKey("sleep_screen_mode")
         val SLEEP_COVER_APPLIED = stringPreferencesKey("sleep_cover_applied")
         val COVER_WIDGET_ID = intPreferencesKey("cover_widget_id")
@@ -149,6 +151,7 @@ class SettingsRepository(private val context: Context) {
             iconPackFallback = p[Keys.ICON_PACK_FALLBACK],
             appIconOverrides = parseIconOverrides(p[Keys.APP_ICON_OVERRIDES]),
             coverSlotMode = CoverSlotMode.from(p[Keys.COVER_SLOT_MODE]),
+            homeBackgroundVersion = p[Keys.HOME_BACKGROUND] ?: 0L,
             sleepScreenMode = SleepScreenMode.from(p[Keys.SLEEP_SCREEN_MODE]),
             lastAppliedSleepCover = p[Keys.SLEEP_COVER_APPLIED] ?: "",
             coverWidgetId = p[Keys.COVER_WIDGET_ID] ?: -1,
@@ -240,6 +243,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setCoverSlotMode(mode: CoverSlotMode) =
         context.launcherDataStore.edit { it[Keys.COVER_SLOT_MODE] = mode.id }
+
+    suspend fun setHomeBackgroundVersion(version: Long) =
+        context.launcherDataStore.edit { it[Keys.HOME_BACKGROUND] = version }
 
     suspend fun setSleepScreenMode(mode: SleepScreenMode) =
         context.launcherDataStore.edit { it[Keys.SLEEP_SCREEN_MODE] = mode.id }
