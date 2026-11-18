@@ -203,10 +203,12 @@ fun BodyText(
     weight: FontWeight = FontWeight.Normal,
     muted: Boolean = false,
     maxLines: Int = 1,
-    color: Color? = null
+    color: Color? = null,
+    textAlign: androidx.compose.ui.text.style.TextAlign? = null
 ) {
     val colors = CrossPointTheme.colors
     androidx.compose.material3.Text(
+        textAlign = textAlign,
         text = text,
         modifier = modifier,
         color = color ?: if (muted) colors.muted else colors.onBackground,

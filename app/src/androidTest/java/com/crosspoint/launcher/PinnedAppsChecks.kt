@@ -59,11 +59,12 @@ object PinnedAppsChecks {
             runBlocking { repo.setHomeItems(mixed) }
             val saved = runBlocking { SettingsRepository(targetContext).settings.first() }
             check(orderedHomeItems(saved.homeMenuItems, apps, saved).map { it.key } == mixed)
-            runBlocking { repo.setHomeItems(mixed + HomeMenuItem.entries.map { "menu:${it.id}" }) }
-            val capped = runBlocking { repo.settings.first() }
-            check(capped.homeItemOrder!!.size == 5 && orderedHomeItems(capped.homeMenuItems, apps, capped).size == 5)
-            runBlocking { repo.setHomeItems(capped.homeItemOrder!! + "extra.app/.Main") }
-            check(runBlocking { repo.settings.first().pinnedApps } == apps.map { it.key }) { "Selection bypassed the five-item limit" }
+            val everything = (mixed + HomeMenuItem.entries.map { "menu:${it.id}" }).distinct()
+            runBlocking { repo.setHomeItems(everything) }
+            val all = runBlocking { repo.settings.first() }
+            check(all.homeItemOrder == everything && orderedHomeItems(all.homeMenuItems, apps, all).size == everything.size) { "Home items were capped" }
+            runBlocking { repo.setHomeItems(all.homeItemOrder!! + "extra.app/.Main") }
+            check(runBlocking { repo.settings.first().pinnedApps } == apps.map { it.key } + "extra.app/.Main") { "Extra app was dropped" }
             check(saved.effectiveHomeMenu(true) == listOf(HomeMenuItem.SETTINGS)) { "OPDS bypassed the chosen items" }
             runBlocking { repo.setHomeItems(LauncherSettings.DEFAULT_MENU.map { "menu:${it.id}" }) }
             onboarding.edit().putBoolean("complete", true).putBoolean("permissions_complete", true).commit()
@@ -87,8 +88,8 @@ object PinnedAppsChecks {
             tap("Settings")
             waitFor { runBlocking { repo.settings.first().homeItemOrder?.size == 5 } }
             tap("File Transfer")
-            check(runBlocking { repo.settings.first().homeItemOrder?.size } == 5)
-            check(HomeMenuItem.FILE_TRANSFER !in runBlocking { repo.settings.first().homeMenuItems })
+            waitFor { runBlocking { repo.settings.first().homeItemOrder?.size == 6 } }
+            check(HomeMenuItem.FILE_TRANSFER in runBlocking { repo.settings.first().homeMenuItems })
             uiAutomation.waitForIdle(250, 5000)
             uiAutomation.takeScreenshot()?.let { bitmap ->
                 java.io.File(targetContext.cacheDir, "pinned-apps.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
@@ -97,7 +98,7 @@ object PinnedAppsChecks {
             tap(apps[0].label)
             waitFor { pins() == listOf(apps[1].key) }
             passed = true
-            result.putString("stream", "Combined Home selection, ordering, limits and unpin checks passed\n")
+            result.putString("stream", "Combined Home selection, ordering, unlimited items and unpin checks passed\n")
         } catch (e: Throwable) {
             uiAutomation.takeScreenshot()?.let { bitmap ->
                 java.io.File(targetContext.cacheDir, "pinned-failure.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()

@@ -28,6 +28,8 @@ data class LauncherSettings(
     val pinnedApps: List<String> = emptyList(),          // "package/activity" entries
     val homeMenuItems: List<HomeMenuItem> = DEFAULT_MENU,
     val homeItemOrder: List<String>? = null,
+    val homeColumns: Int = 0,                            // 0 = the theme's own layout
+    val homeRows: Int = 0,                               // 0 = natural row height, scrolling
     val bookFolders: List<String> = emptyList(),         // extra custom scan folders
     val searchGesture: SearchGesture = SearchGesture.SWIPE_UP,
     val autoOpenSingleResult: Boolean = true,
@@ -56,11 +58,15 @@ data class LauncherSettings(
 
     fun orderedHomeKeys(menu: List<HomeMenuItem>, apps: List<String>): List<String> {
         val available = menu.map { "menu:${it.id}" } + apps
-        return (homeItemOrder.orEmpty() + available).distinct().filter { it in available }.take(MAX_HOME_ITEMS)
+        return (homeItemOrder.orEmpty() + available).distinct().filter { it in available }
     }
 
+    /** True when Home items use the user's rows × columns grid instead of the theme layout. */
+    val homeGrid: Boolean get() = homeColumns > 0
+
     companion object {
-        const val MAX_HOME_ITEMS = 5
+        const val MAX_HOME_COLUMNS = 8
+        const val MAX_HOME_ROWS = 12
         val DEFAULT_MENU = listOf(
             HomeMenuItem.BROWSE_BOOKS,
             HomeMenuItem.RECENT_BOOKS,
@@ -82,6 +88,8 @@ class SettingsRepository(private val context: Context) {
         val PINNED_ORDER = stringPreferencesKey("pinned_order")      // ordered csv
         val MENU = stringPreferencesKey("home_menu")                 // ordered csv of ids
         val HOME_ORDER = stringPreferencesKey("home_item_order")
+        val HOME_COLUMNS = intPreferencesKey("home_columns")
+        val HOME_ROWS = intPreferencesKey("home_rows")
         val FOLDERS = stringSetPreferencesKey("book_folders")
         val SEARCH_GESTURE = stringPreferencesKey("search_gesture")
         val AUTO_OPEN_SINGLE = booleanPreferencesKey("auto_open_single")
@@ -120,6 +128,8 @@ class SettingsRepository(private val context: Context) {
             pinnedApps = pinned,
             homeMenuItems = menu,
             homeItemOrder = p[Keys.HOME_ORDER]?.split("\n")?.filter { it.isNotBlank() },
+            homeColumns = (p[Keys.HOME_COLUMNS] ?: 0).coerceIn(0, LauncherSettings.MAX_HOME_COLUMNS),
+            homeRows = (p[Keys.HOME_ROWS] ?: 0).coerceIn(0, LauncherSettings.MAX_HOME_ROWS),
             bookFolders = (p[Keys.FOLDERS] ?: emptySet()).toList(),
             searchGesture = SearchGesture.from(p[Keys.SEARCH_GESTURE]),
             autoOpenSingleResult = p[Keys.AUTO_OPEN_SINGLE] ?: true,
@@ -158,13 +168,18 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun setHomeItems(entries: List<String>) = context.launcherDataStore.edit { p ->
-        val ordered = entries.filter { it.isNotBlank() }.distinct().take(LauncherSettings.MAX_HOME_ITEMS)
+        val ordered = entries.filter { it.isNotBlank() }.distinct()
         val apps = ordered.filterNot { it.startsWith("menu:") }
         p[Keys.HOME_ORDER] = ordered.joinToString("\n")
         p[Keys.MENU] = ordered.filter { it.startsWith("menu:") }
             .mapNotNull { HomeMenuItem.from(it.removePrefix("menu:")) }.joinToString(",") { it.id }
         p[Keys.PINNED_ORDER] = apps.joinToString("\n")
         p[Keys.PINNED] = apps.toSet()
+    }
+
+    suspend fun setHomeGrid(columns: Int, rows: Int) = context.launcherDataStore.edit {
+        it[Keys.HOME_COLUMNS] = columns.coerceIn(0, LauncherSettings.MAX_HOME_COLUMNS)
+        it[Keys.HOME_ROWS] = rows.coerceIn(0, LauncherSettings.MAX_HOME_ROWS)
     }
 
     suspend fun setBookFolders(folders: List<String>) = context.launcherDataStore.edit {

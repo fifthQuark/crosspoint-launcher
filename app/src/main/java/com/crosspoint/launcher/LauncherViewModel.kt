@@ -309,10 +309,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val current = settings.value
         val selected = current.orderedHomeKeys(current.effectiveHomeMenu(opdsServers.value.isNotEmpty()),
             pinnedAppInfos(current, apps.value).map { "${it.packageName}/${it.activityName}" })
-        if (entry !in selected && selected.size >= LauncherSettings.MAX_HOME_ITEMS) {
-            android.widget.Toast.makeText(getApplication(), "Home can show up to 5 items", android.widget.Toast.LENGTH_SHORT).show()
-        } else settingsRepo.setHomeItems(if (entry in selected) selected - entry else selected + entry)
+        settingsRepo.setHomeItems(if (entry in selected) selected - entry else selected + entry)
     }
+    fun setHomeGrid(columns: Int, rows: Int) = viewModelScope.launch { settingsRepo.setHomeGrid(columns, rows) }
     fun setAppStore(pkg: String?) = viewModelScope.launch { settingsRepo.setAppStore(pkg) }
     fun setHomeItems(entries: List<String>) = viewModelScope.launch { settingsRepo.setHomeItems(entries) }
     fun setSearchGesture(g: com.crosspoint.launcher.model.SearchGesture) =

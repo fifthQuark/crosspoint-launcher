@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +35,7 @@ import com.crosspoint.launcher.ui.components.BodyText
 import com.crosspoint.launcher.ui.components.LauncherAppIcon
 import com.crosspoint.launcher.ui.components.LyraHeader
 import com.crosspoint.launcher.ui.components.Pressable
+import com.crosspoint.launcher.ui.components.verticalScrollWithIndicator
 import com.crosspoint.launcher.ui.icons.LucideIcon
 import com.crosspoint.launcher.ui.theme.CrossPointTheme
 import com.crosspoint.launcher.util.Launching
@@ -183,6 +186,127 @@ fun LauncherColumns(
 
 enum class LauncherMenuStyle { Standard, Minimal }
 
+/** Scroll the Home body in theme layouts; a custom grid instead gets the rest of [column]'s height. */
+@Composable
+fun Modifier.homeBody(column: ColumnScope, state: HomeUiState): Modifier =
+    if (state.settings.homeGrid) with(column) { this@homeBody.weight(1f) } else verticalScrollWithIndicator()
+
+/** Home shortcuts in the theme's own layout, or the user's rows × columns grid when one is set. */
+@Composable
+fun ColumnScope.HomeItems(
+    state: HomeUiState,
+    cb: HomeCallbacks,
+    menuStyle: LauncherMenuStyle = LauncherMenuStyle.Standard
+) {
+    if (state.settings.homeGrid) {
+        HomeItemsGrid(
+            items = orderedHomeItems(state.menuItems, state.pinnedApps, state.settings),
+            settings = state.settings,
+            onLaunch = cb.onLaunchApp,
+            onLongPressApp = cb.onAppInfo,
+            onMenu = cb.onMenu,
+            modifier = Modifier.fillMaxWidth().weight(1f)
+        )
+    } else {
+        LauncherColumns(
+            pinnedApps = state.pinnedApps,
+            menuItems = state.menuItems,
+            settings = state.settings,
+            onLaunch = cb.onLaunchApp,
+            onLongPressApp = cb.onAppInfo,
+            onMenu = cb.onMenu,
+            modifier = Modifier.fillMaxWidth(),
+            menuStyle = menuStyle
+        )
+    }
+}
+
+/**
+ * Home shortcuts in a grid of [LauncherSettings.homeColumns] columns. With rows set, each row
+ * takes an equal share of the height so that many rows fill the screen; further items scroll.
+ */
+@Composable
+fun HomeItemsGrid(
+    items: List<LauncherColumnItem>,
+    settings: com.crosspoint.launcher.data.LauncherSettings,
+    onLaunch: (String, String) -> Unit,
+    onLongPressApp: (AppInfo) -> Unit,
+    onMenu: (HomeMenuItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val m = CrossPointTheme.metrics
+    val columns = settings.homeColumns.coerceAtLeast(1)
+    // Three or more columns are too narrow for side-by-side labels: stack the label under the icon.
+    val stacked = columns >= 3
+    BoxWithConstraints(modifier) {
+        val rowHeight = when {
+            settings.homeRows > 0 && constraints.hasBoundedHeight -> maxHeight / settings.homeRows
+            stacked -> 96.dp
+            else -> m.menuRowHeight + 8.dp
+        }
+        // Side-by-side labels need most of the cell width, so their icons stay smaller.
+        val iconSize = if (stacked) (rowHeight * 0.42f).coerceIn(16.dp, 56.dp) else (rowHeight * 0.55f).coerceIn(16.dp, 40.dp)
+        Column(Modifier.fillMaxWidth().then(if (constraints.hasBoundedHeight) Modifier.verticalScrollWithIndicator() else Modifier)) {
+            items.chunked(columns).forEach { rowItems ->
+                Row(Modifier.fillMaxWidth().height(rowHeight)) {
+                    rowItems.forEach { item ->
+                        HomeGridCell(item, settings, stacked, iconSize, onLaunch, onLongPressApp, onMenu,
+                            Modifier.weight(1f).fillMaxHeight())
+                    }
+                    repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeGridCell(
+    item: LauncherColumnItem,
+    settings: com.crosspoint.launcher.data.LauncherSettings,
+    stacked: Boolean,
+    iconSize: androidx.compose.ui.unit.Dp,
+    onLaunch: (String, String) -> Unit,
+    onLongPressApp: (AppInfo) -> Unit,
+    onMenu: (HomeMenuItem) -> Unit,
+    modifier: Modifier
+) {
+    val icon: @Composable () -> Unit = {
+        when (item) {
+            is LauncherColumnItem.MenuAction -> LucideIcon(item.item.icon, Modifier.size(iconSize))
+            is LauncherColumnItem.PinnedApp -> LauncherAppIcon(item.app, settings, size = iconSize)
+        }
+    }
+    Pressable(
+        onClick = {
+            when (item) {
+                is LauncherColumnItem.MenuAction -> onMenu(item.item)
+                is LauncherColumnItem.PinnedApp -> onLaunch(item.app.packageName, item.app.activityName)
+            }
+        },
+        onLongClick = (item as? LauncherColumnItem.PinnedApp)?.let { pinned -> { onLongPressApp(pinned.app) } },
+        modifier = modifier
+    ) {
+        if (stacked) {
+            Column(
+                Modifier.fillMaxSize().padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                icon()
+                Spacer(Modifier.height(4.dp))
+                BodyText(item.label, size = 13, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        } else {
+            Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                icon()
+                Spacer(Modifier.width(14.dp))
+                BodyText(item.label, weight = FontWeight.SemiBold, size = 16, maxLines = 2)
+            }
+        }
+    }
+}
+
 @Composable
 private fun <T> TwoColumnLauncherList(
     items: List<T>,
@@ -190,8 +314,10 @@ private fun <T> TwoColumnLauncherList(
     verticalSpacing: androidx.compose.ui.unit.Dp,
     itemContent: @Composable (T) -> Unit
 ) {
-    val left = items.take(6)
-    val right = items.drop(6).take(6)
+    // Six per column as before; longer lists split evenly so every chosen item stays visible.
+    val perColumn = maxOf(6, (items.size + 1) / 2)
+    val left = items.take(perColumn)
+    val right = items.drop(perColumn)
     BoxWithConstraints(modifier) {
         val columnGap = (maxWidth * 0.18f).coerceIn(32.dp, 140.dp)
         Row(

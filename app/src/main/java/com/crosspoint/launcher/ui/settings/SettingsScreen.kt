@@ -292,11 +292,26 @@ fun SettingsScreen(
                             }
                         }
                     }
+                    item { BodyText("Layout", muted = true, size = 14, modifier = Modifier.padding(top = 4.dp)) }
+                    item {
+                        StepperRow("Columns", if (settings.homeColumns == 0) "Theme Default" else "${settings.homeColumns}",
+                            canDecrease = settings.homeColumns > 0,
+                            canIncrease = settings.homeColumns < com.crosspoint.launcher.data.LauncherSettings.MAX_HOME_COLUMNS,
+                            onDecrease = { vm.setHomeGrid(settings.homeColumns - 1, if (settings.homeColumns == 1) 0 else settings.homeRows) },
+                            onIncrease = { vm.setHomeGrid(settings.homeColumns + 1, settings.homeRows) })
+                    }
+                    if (settings.homeGrid) item {
+                        StepperRow("Rows", if (settings.homeRows == 0) "Auto" else "${settings.homeRows}",
+                            canDecrease = settings.homeRows > 0,
+                            canIncrease = settings.homeRows < com.crosspoint.launcher.data.LauncherSettings.MAX_HOME_ROWS,
+                            onDecrease = { vm.setHomeGrid(settings.homeColumns, settings.homeRows - 1) },
+                            onIncrease = { vm.setHomeGrid(settings.homeColumns, settings.homeRows + 1) })
+                    }
                     val selected = orderedHomeItems(settings.effectiveHomeMenu(opdsServers.isNotEmpty()), vm.pinnedAppInfos(settings, apps), settings)
                     val entries = selected.map { it.key }
                     val available = HomeMenuItem.entries.map { LauncherColumnItem.MenuAction(it) } + apps.map { LauncherColumnItem.PinnedApp(it) }
-                    item { BodyText("${entries.size} of 5 Items Selected", weight = FontWeight.Medium, size = 16) }
-                    item { BodyText("Choose up to five Home shortcuts. Tap an app icon to change it.", muted = true, size = 14, maxLines = Int.MAX_VALUE) }
+                    item { BodyText("${entries.size} ${if (entries.size == 1) "Item" else "Items"} Selected", weight = FontWeight.Medium, size = 16, modifier = Modifier.padding(top = 12.dp)) }
+                    item { BodyText("Choose Home shortcuts. Tap an app icon to change it.", muted = true, size = 14, maxLines = Int.MAX_VALUE) }
                     items(selected + available.filterNot { it.key in entries }, key = { it.key }) { entry ->
                         HomeItemSettingsRow(entry, settings, entries, { vm.setHomeItems(it) }, {
                             if (entry is LauncherColumnItem.PinnedApp) editingIconFor = entry.app
@@ -453,16 +468,11 @@ private fun HomeItemSettingsRow(
     onSetItems: (List<String>) -> Unit,
     onChooseIcon: () -> Unit
 ) {
-    val context = LocalContext.current
     val entry = item.key
     val index = selectedEntries.indexOf(entry)
     Column(Modifier.fillMaxWidth()) {
         Pressable(
-            onClick = {
-                if (index < 0 && selectedEntries.size >= com.crosspoint.launcher.data.LauncherSettings.MAX_HOME_ITEMS) {
-                    android.widget.Toast.makeText(context, "Home can show up to 5 items", android.widget.Toast.LENGTH_SHORT).show()
-                } else onSetItems(if (index >= 0) selectedEntries - entry else selectedEntries + entry)
-            },
+            onClick = { onSetItems(if (index >= 0) selectedEntries - entry else selectedEntries + entry) },
             modifier = Modifier.fillMaxWidth().semantics {
                 role = Role.Checkbox
                 stateDescription = if (index >= 0) "Selected" else "Not Selected"
@@ -512,6 +522,32 @@ private fun HomeItemSettingsRow(
                     }
                 }
             }
+        }
+    }
+}
+
+/** A setting with a value adjusted by minus/plus buttons. */
+@Composable
+internal fun StepperRow(
+    title: String,
+    value: String,
+    canDecrease: Boolean,
+    canIncrease: Boolean,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 4.dp, horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        BodyText(title, weight = FontWeight.SemiBold, size = 16, modifier = Modifier.weight(1f))
+        Box(Modifier.semantics { contentDescription = "Decrease $title" }) {
+            HeaderIconButton("minus", { if (canDecrease) onDecrease() }, iconSize = 20.dp)
+        }
+        BodyText(value, weight = FontWeight.Medium, size = 16, modifier = Modifier.width(112.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Box(Modifier.semantics { contentDescription = "Increase $title" }) {
+            HeaderIconButton("plus", { if (canIncrease) onIncrease() }, iconSize = 20.dp)
         }
     }
 }

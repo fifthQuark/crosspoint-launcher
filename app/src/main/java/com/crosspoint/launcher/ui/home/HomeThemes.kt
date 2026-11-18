@@ -48,7 +48,7 @@ fun LyraHome(state: HomeUiState, cb: HomeCallbacks) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScrollWithIndicator()
+                .homeBody(this, state)
                 .padding(horizontal = m.contentSidePadding, vertical = homeCoverVisualGap()),
             verticalArrangement = Arrangement.spacedBy(homeCoverVisualGap())
         ) {
@@ -61,15 +61,7 @@ fun LyraHome(state: HomeUiState, cb: HomeCallbacks) {
                     else -> BooksPlaceholder(state, cb)
                 }
             }
-            LauncherColumns(
-                pinnedApps = state.pinnedApps,
-                menuItems = state.menuItems,
-                settings = state.settings,
-                onLaunch = cb.onLaunchApp,
-                onLongPressApp = cb.onAppInfo,
-                onMenu = cb.onMenu,
-                modifier = Modifier.fillMaxWidth()
-            )
+            HomeItems(state, cb)
         }
     }
 }
@@ -152,7 +144,7 @@ fun Lyra3CoversHome(state: HomeUiState, cb: HomeCallbacks) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScrollWithIndicator()
+                .homeBody(this, state)
                 .padding(horizontal = m.contentSidePadding, vertical = homeCoverVisualGap()),
             verticalArrangement = Arrangement.spacedBy(homeCoverVisualGap())
         ) {
@@ -174,15 +166,7 @@ fun Lyra3CoversHome(state: HomeUiState, cb: HomeCallbacks) {
                     }
                 }
             }
-            LauncherColumns(
-                pinnedApps = state.pinnedApps,
-                menuItems = state.menuItems,
-                settings = state.settings,
-                onLaunch = cb.onLaunchApp,
-                onLongPressApp = cb.onAppInfo,
-                onMenu = cb.onMenu,
-                modifier = Modifier.fillMaxWidth()
-            )
+            HomeItems(state, cb)
         }
     }
 }
@@ -219,7 +203,7 @@ fun CarouselHome(state: HomeUiState, cb: HomeCallbacks) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScrollWithIndicator()
+                .homeBody(this, state)
                 .padding(vertical = homeCoverVisualGap()),
             verticalArrangement = Arrangement.spacedBy(homeCoverVisualGap())
         ) {
@@ -259,16 +243,8 @@ fun CarouselHome(state: HomeUiState, cb: HomeCallbacks) {
                     }
                 }
             }
-            Box(Modifier.padding(horizontal = m.contentSidePadding)) {
-                LauncherColumns(
-                    pinnedApps = state.pinnedApps,
-                    menuItems = state.menuItems,
-                    settings = state.settings,
-                    onLaunch = cb.onLaunchApp,
-                    onLongPressApp = cb.onAppInfo,
-                    onMenu = cb.onMenu,
-                    modifier = Modifier.fillMaxWidth()
-                )
+            Column(Modifier.padding(horizontal = m.contentSidePadding).then(if (state.settings.homeGrid) Modifier.weight(1f) else Modifier)) {
+                HomeItems(state, cb)
             }
         }
     }
@@ -304,7 +280,7 @@ fun MinimalHome(state: HomeUiState, cb: HomeCallbacks) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScrollWithIndicator()
+                .homeBody(this, state)
                 .padding(horizontal = m.contentSidePadding, vertical = m.verticalSpacing),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -344,16 +320,7 @@ fun MinimalHome(state: HomeUiState, cb: HomeCallbacks) {
             }
 
             DividerLine()
-            LauncherColumns(
-                pinnedApps = state.pinnedApps,
-                menuItems = state.menuItems,
-                settings = state.settings,
-                onLaunch = cb.onLaunchApp,
-                onLongPressApp = cb.onAppInfo,
-                onMenu = cb.onMenu,
-                modifier = Modifier.fillMaxWidth(),
-                menuStyle = LauncherMenuStyle.Minimal
-            )
+            HomeItems(state, cb, LauncherMenuStyle.Minimal)
         }
     }
 }
@@ -454,7 +421,9 @@ fun CompactHome(state: HomeUiState, cb: HomeCallbacks) {
                 } else if (!state.hasStorage) StorageHint(cb.onGrantStorage)
             }
             val entries = orderedHomeItems(state.menuItems, state.pinnedApps, state.settings)
-            ScrollList(Modifier.weight(1f).fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = m.contentSidePadding)) {
+            if (state.settings.homeGrid) HomeItemsGrid(entries, state.settings, cb.onLaunchApp, cb.onAppInfo, cb.onMenu,
+                Modifier.weight(1f).fillMaxWidth().padding(horizontal = m.contentSidePadding))
+            else ScrollList(Modifier.weight(1f).fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = m.contentSidePadding)) {
                 items(entries) { entry ->
                     val label = when (entry) { is LauncherColumnItem.MenuAction -> entry.item.label; is LauncherColumnItem.PinnedApp -> entry.app.label }
                     Pressable(onClick = { when (entry) { is LauncherColumnItem.MenuAction -> cb.onMenu(entry.item); is LauncherColumnItem.PinnedApp -> cb.onLaunchApp(entry.app.packageName, entry.app.activityName) } },

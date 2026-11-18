@@ -67,6 +67,10 @@ fun lucideRes(name: String): Int = when (name) {
     "chevron_up" -> R.drawable.ic_chevron_up
     "chevron_down" -> R.drawable.ic_chevron_down
     "plus" -> R.drawable.ic_plus
+    "minus" -> R.drawable.ic_minus
+    "bell" -> R.drawable.ic_bell
+    "rss" -> R.drawable.ic_rss
+    "panels_top_left" -> R.drawable.ic_panels_top_left
     "clock" -> R.drawable.ic_clock
     "battery" -> R.drawable.ic_battery
     "battery_low" -> R.drawable.ic_battery_low
@@ -101,7 +105,8 @@ val LucideIconLibrary = listOf(
     "tablet", "store", "shopping_bag", "shopping_basket", "globe", "app_window", "mail",
     "calendar", "camera", "map", "music", "headphones", "film", "gamepad_2", "newspaper", "package",
     "package_open", "boxes", "play", "badge_dollar_sign", "folder", "folder_open", "settings",
-    "send_horizontal", "layout_grid", "search", "pin", "circle", "square", "dot"
+    "send_horizontal", "layout_grid", "search", "pin", "circle", "square", "dot",
+    "bell", "rss", "panels_top_left"
 )
 
 /** A Lucide icon tinted with the current foreground color (or [tintOverride]). */
