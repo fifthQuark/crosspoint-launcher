@@ -298,6 +298,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     // --- settings mutations ---
     fun setTheme(t: ThemeType) = viewModelScope.launch { settingsRepo.setTheme(t) }
     fun setAppearance(a: AppearanceMode) = viewModelScope.launch { settingsRepo.setAppearance(a) }
+    fun setImageColorMode(mode: com.crosspoint.launcher.model.ImageColorMode) =
+        viewModelScope.launch { settingsRepo.setImageColorMode(mode) }
     fun setDefaultReader(pkg: String?) = viewModelScope.launch { settingsRepo.setDefaultReader(pkg) }
     fun togglePinned(entry: String) = viewModelScope.launch {
         val current = settings.value

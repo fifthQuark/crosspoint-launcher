@@ -219,6 +219,10 @@ fun SettingsScreen(
                 "Home Theme" -> items(ThemeType.entries.filter { it != ThemeType.CAROUSEL }) { theme -> SelectRow(theme.label, theme.description, settings.theme == theme) { vm.setTheme(theme) } }
                 "Appearance" -> {
                     items(AppearanceMode.entries) { mode -> SelectRow(mode.label, "", settings.appearance == mode) { vm.setAppearance(mode) } }
+                    item { BodyText("Covers and Pictures", weight = FontWeight.Bold, size = 14, muted = true, modifier = Modifier.padding(top = 12.dp, start = 6.dp)) }
+                    items(com.crosspoint.launcher.model.ImageColorMode.entries) { mode ->
+                        SelectRow(mode.label, mode.description, settings.imageColorMode == mode) { vm.setImageColorMode(mode) }
+                    }
                     items(CoverSlotMode.entries) { mode -> SelectRow(mode.label, "Cover area", settings.coverSlotMode == mode) { vm.setCoverSlotMode(mode) } }
                     if (settings.coverSlotMode == CoverSlotMode.WIDGET) {
                         item { ActionRow("Choose Widget", "", "app_window", onPickWidget) }

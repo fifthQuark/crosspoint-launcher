@@ -228,12 +228,13 @@ fun BookCover(
 ) {
     val colors = CrossPointTheme.colors
     val m = CrossPointTheme.metrics
+    val colorMode = CrossPointTheme.imageColorMode
     var coverSize by remember { mutableStateOf(IntSize.Zero) }
-    var rendered by remember(cover, coverSize) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(cover, coverSize) {
+    var rendered by remember(cover, coverSize, colorMode) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(cover, coverSize, colorMode) {
         if (cover != null && coverSize.width > 0 && coverSize.height > 0) {
             rendered = withContext(Dispatchers.Default) {
-                Dither.cover(cover.asAndroidBitmap(), coverSize.width, coverSize.height).asImageBitmap()
+                Dither.cover(cover.asAndroidBitmap(), coverSize.width, coverSize.height, colorMode).asImageBitmap()
             }
         }
     }

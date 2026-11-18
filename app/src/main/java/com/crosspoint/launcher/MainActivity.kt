@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
                 statusBarHidden = settings.hideStatusBar
                 applyStatusBarVisibility()
             }
-            CrossPointTheme(appearance = settings.appearance, metrics = Metrics()) {
+            CrossPointTheme(appearance = settings.appearance, metrics = Metrics(), imageColorMode = settings.imageColorMode) {
                 AdaptiveMetrics {
                     LauncherRoot(
                         vm = vm,

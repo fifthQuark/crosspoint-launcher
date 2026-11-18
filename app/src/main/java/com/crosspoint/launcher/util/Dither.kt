@@ -1,6 +1,7 @@
 package com.crosspoint.launcher.util
 
 import android.graphics.Bitmap
+import com.crosspoint.launcher.model.ImageColorMode
 
 /**
  * Photo -> e-ink: luminance, auto-levels, then Floyd-Steinberg error diffusion.
@@ -47,7 +48,7 @@ object Dither {
     }
 
     /** Crop and resize before dithering so display scaling cannot blend the black/white dots. */
-    fun cover(src: Bitmap, width: Int, height: Int): Bitmap {
+    fun cover(src: Bitmap, width: Int, height: Int, mode: ImageColorMode = ImageColorMode.DITHERED): Bitmap {
         require(width > 0 && height > 0)
         val scaled = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         try {
@@ -58,8 +59,32 @@ object Dither {
             val top = (height - src.height * scale) / 2f
             canvas.drawBitmap(src, null, android.graphics.RectF(left, top, left + src.width * scale, top + src.height * scale),
                 android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
-            return toEink(scaled, Bitmap.Config.RGB_565, monochrome = true)
+            return render(scaled, mode)
         } finally { scaled.recycle() }
+    }
+
+    /** Converts an already-sized image for display in [mode]; the source is left untouched. */
+    fun render(src: Bitmap, mode: ImageColorMode): Bitmap = when (mode) {
+        ImageColorMode.DITHERED -> toEink(src, Bitmap.Config.RGB_565, monochrome = true)
+        ImageColorMode.GRAYSCALE -> toGrayscale(src)
+        ImageColorMode.COLOR -> src.copy(Bitmap.Config.RGB_565, false)
+    }
+
+    /** Smooth grayscale with the same auto-levels as dithering, for panels that show gray well. */
+    fun toGrayscale(src: Bitmap): Bitmap {
+        val w = src.width
+        val h = src.height
+        val px = IntArray(w * h).also { src.getPixels(it, 0, w, 0, 0, w, h) }
+        val lum = FloatArray(w * h) { i ->
+            val p = px[i]
+            0.299f * ((p ushr 16) and 0xFF) + 0.587f * ((p ushr 8) and 0xFF) + 0.114f * (p and 0xFF)
+        }
+        applyAutoLevels(lum)
+        for (i in px.indices) {
+            val gray = lum[i].toInt().coerceIn(0, 255)
+            px[i] = 0xFF000000.toInt() or (gray * 0x010101)
+        }
+        return Bitmap.createBitmap(px, w, h, Bitmap.Config.RGB_565)
     }
 
     private fun quantize(v: Float): Int =

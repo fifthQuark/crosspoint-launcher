@@ -45,6 +45,20 @@ enum class CoverSlotMode(val id: String, val label: String) {
     }
 }
 
+/**
+ * How book covers and other pictures are drawn. Dithering suits black & white e-ink panels;
+ * grayscale and color are for panels (or phones) that can show them.
+ */
+enum class ImageColorMode(val id: String, val label: String, val description: String) {
+    DITHERED("dithered", "Black & White, Dithered", "Sharp dot patterns for e-ink"),
+    GRAYSCALE("grayscale", "Grayscale", "Smooth shades of gray"),
+    COLOR("color", "Color", "Original colors");
+
+    companion object {
+        fun from(id: String?): ImageColorMode = entries.firstOrNull { it.id == id } ?: DITHERED
+    }
+}
+
 /** What the e-ink sleep screen shows. BOOK_COVER tracks the most recent book automatically. */
 enum class SleepScreenMode(val id: String, val label: String) {
     OFF("off", "Off"),

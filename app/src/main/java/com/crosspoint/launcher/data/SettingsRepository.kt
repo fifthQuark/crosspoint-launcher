@@ -10,6 +10,7 @@ import com.crosspoint.launcher.model.AppearanceMode
 import com.crosspoint.launcher.model.CoverSlotMode
 import com.crosspoint.launcher.model.SleepScreenMode
 import com.crosspoint.launcher.model.HomeMenuItem
+import com.crosspoint.launcher.model.ImageColorMode
 import com.crosspoint.launcher.model.LauncherIconStyle
 import com.crosspoint.launcher.model.SearchGesture
 import com.crosspoint.launcher.model.ThemeType
@@ -21,6 +22,7 @@ import org.json.JSONObject
 data class LauncherSettings(
     val theme: ThemeType = ThemeType.LYRA,
     val appearance: AppearanceMode = AppearanceMode.LIGHT,
+    val imageColorMode: ImageColorMode = ImageColorMode.DITHERED,
     val defaultReaderPackage: String? = null,
     val pinnedApps: List<String> = emptyList(),          // "package/activity" entries
     val homeMenuItems: List<HomeMenuItem> = DEFAULT_MENU,
@@ -72,6 +74,7 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val THEME = stringPreferencesKey("theme")
         val APPEARANCE = stringPreferencesKey("appearance")
+        val IMAGE_COLOR_MODE = stringPreferencesKey("image_color_mode")
         val DEFAULT_READER = stringPreferencesKey("default_reader")
         val PINNED = stringSetPreferencesKey("pinned_apps")          // unordered set
         val PINNED_ORDER = stringPreferencesKey("pinned_order")      // ordered csv
@@ -109,6 +112,7 @@ class SettingsRepository(private val context: Context) {
         LauncherSettings(
             theme = ThemeType.from(p[Keys.THEME]),
             appearance = AppearanceMode.from(p[Keys.APPEARANCE]),
+            imageColorMode = ImageColorMode.from(p[Keys.IMAGE_COLOR_MODE]),
             defaultReaderPackage = p[Keys.DEFAULT_READER],
             pinnedApps = pinned,
             homeMenuItems = menu,
@@ -138,6 +142,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setAppearance(a: AppearanceMode) =
         context.launcherDataStore.edit { it[Keys.APPEARANCE] = a.id }
+
+    suspend fun setImageColorMode(mode: ImageColorMode) =
+        context.launcherDataStore.edit { it[Keys.IMAGE_COLOR_MODE] = mode.id }
 
     suspend fun setDefaultReader(pkg: String?) = context.launcherDataStore.edit {
         if (pkg == null) it.remove(Keys.DEFAULT_READER) else it[Keys.DEFAULT_READER] = pkg

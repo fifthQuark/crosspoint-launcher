@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.crosspoint.launcher.model.AppearanceMode
+import com.crosspoint.launcher.model.ImageColorMode
 
 /**
  * Black & white e-ink palette. Only pure black, pure white and a single mid value are used so
@@ -71,18 +72,23 @@ val LocalEinkColors: ProvidableCompositionLocal<EinkColors> =
     staticCompositionLocalOf { LightEink }
 val LocalMetrics: ProvidableCompositionLocal<Metrics> =
     staticCompositionLocalOf { Metrics() }
+val LocalImageColorMode: ProvidableCompositionLocal<ImageColorMode> =
+    staticCompositionLocalOf { ImageColorMode.DITHERED }
 
 object CrossPointTheme {
     val colors: EinkColors
         @Composable get() = LocalEinkColors.current
     val metrics: Metrics
         @Composable get() = LocalMetrics.current
+    val imageColorMode: ImageColorMode
+        @Composable get() = LocalImageColorMode.current
 }
 
 @Composable
 fun CrossPointTheme(
     appearance: AppearanceMode,
     metrics: Metrics = Metrics(),
+    imageColorMode: ImageColorMode = ImageColorMode.DITHERED,
     content: @Composable () -> Unit
 ) {
     val dark = when (appearance) {
@@ -94,6 +100,7 @@ fun CrossPointTheme(
     CompositionLocalProvider(
         LocalEinkColors provides colors,
         LocalMetrics provides metrics,
+        LocalImageColorMode provides imageColorMode,
         content = content
     )
 }
